@@ -25,6 +25,7 @@ class Base(DeclarativeBase):
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Write session — auto-commits on success, rolls back on error."""
     async with async_session_factory() as session:
         try:
             yield session
@@ -32,3 +33,9 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def get_read_session() -> AsyncGenerator[AsyncSession, None]:
+    """Read-only session — no commit, no rollback overhead."""
+    async with async_session_factory() as session:
+        yield session
