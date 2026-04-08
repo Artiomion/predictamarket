@@ -11,8 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared.config import settings  # noqa: E402
 from shared.logging import setup_logging  # noqa: E402
+from shared.monitoring import init_sentry, metrics_router, MetricsMiddleware  # noqa: E402
 
 setup_logging()
+init_sentry()
 
 from middleware.jwt_auth import JWTAuthMiddleware  # noqa: E402
 from middleware.rate_limit import RateLimitMiddleware  # noqa: E402
@@ -47,9 +49,11 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-User-Id", "X-User-Tier", "X-Internal-Key", "X-Request-Id"],
 )
 
+app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(JWTAuthMiddleware)
 
 app.include_router(health_router)
+app.include_router(metrics_router)
 app.include_router(proxy_router)

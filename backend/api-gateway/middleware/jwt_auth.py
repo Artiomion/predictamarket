@@ -12,6 +12,7 @@ from shared.config import settings  # noqa: E402
 # Routes that do NOT require authentication
 PUBLIC_ROUTES: list[tuple[str, set[str]]] = [
     ("/health",                            {"GET"}),
+    ("/metrics",                           {"GET"}),
     ("/api/auth/register",                 {"POST"}),
     ("/api/auth/login",                    {"POST"}),
     ("/api/auth/refresh",                  {"POST"}),
