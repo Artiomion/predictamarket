@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
-from shared.database import get_session
+from shared.database import get_read_session as get_session
 
 from schemas.edgar import (
     BalanceSheetResponse,

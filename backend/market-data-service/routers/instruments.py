@@ -2,7 +2,7 @@ import structlog
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.database import get_session
+from shared.database import get_read_session as get_session
 
 from schemas.market import (
     CurrentPriceResponse,

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
-from shared.database import get_session
+from shared.database import get_read_session, get_session
 from shared.rate_limit import check_rate_limit
 from shared.redis_client import redis_client
 from shared.tier_limits import FORECAST_DAILY_LIMITS, TOP_PICKS_LIMITS
@@ -52,7 +52,7 @@ async def _check_forecast_rate_limit(user_id: str, tier: str) -> None:
 async def top_picks(
     limit: int = Query(20, ge=1, le=50),
     x_user_tier: str = Header("free"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[dict]:
     """Top picks by predicted return. Free→5, Pro/Premium→20."""
     max_limit = TOP_PICKS_LIMITS.get(x_user_tier, 5)
@@ -63,7 +63,7 @@ async def top_picks(
 async def signals(
     signal: str | None = Query(None, pattern="^(BUY|SELL|HOLD)$"),
     confidence: str | None = Query(None, pattern="^(HIGH|MEDIUM|LOW)$"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[ForecastFromDB]:
     rows = await get_signals(session, signal=signal, confidence=confidence)
     return [ForecastFromDB.model_validate(r) for r in rows]
@@ -128,7 +128,7 @@ async def create_forecast(
 @router.get("/{ticker}", response_model=ForecastResponse)
 async def get_forecast(
     ticker: str,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     """Get latest forecast from DB."""
     data = await get_latest_forecast(session, ticker)
@@ -141,7 +141,7 @@ async def get_forecast(
 async def forecast_history(
     ticker: str,
     limit: int = Query(30, ge=1, le=100),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[ForecastFromDB]:
     rows = await get_forecast_history(session, ticker, limit=limit)
     return [ForecastFromDB.model_validate(r) for r in rows]

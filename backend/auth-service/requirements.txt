@@ -11,3 +11,4 @@ pydantic[email]==2.12.5
 pydantic-settings==2.13.1
 structlog==25.1.0
 httpx==0.28.1
+sentry-sdk[fastapi]==2.29.1

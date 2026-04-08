@@ -8,3 +8,4 @@ pydantic-settings==2.13.1
 structlog==25.1.0
 yfinance==0.2.55
 lxml==5.4.0
+sentry-sdk[fastapi]==2.29.1

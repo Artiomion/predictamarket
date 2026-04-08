@@ -9,8 +9,10 @@ from fastapi import FastAPI
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared.logging import setup_logging  # noqa: E402
+from shared.monitoring import init_sentry
 
 setup_logging()
+init_sentry()
 
 from routers.auth import router as auth_router  # noqa: E402
 from routers.health import router as health_router  # noqa: E402

@@ -12,8 +12,10 @@ for _p in [_app_dir.parent, _app_dir]:
         sys.path.insert(0, str(_p))
 
 from shared.logging import setup_logging  # noqa: E402
+from shared.monitoring import init_sentry
 
 setup_logging()
+init_sentry()
 
 from routers.health import router as health_router  # noqa: E402
 from routers.portfolios import router as portfolios_router  # noqa: E402

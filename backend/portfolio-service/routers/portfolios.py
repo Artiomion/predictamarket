@@ -6,7 +6,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
-from shared.database import get_session
+from shared.database import get_read_session, get_session
 
 from schemas.portfolio import (
     AddPositionRequest,
@@ -49,7 +49,7 @@ async def create_portfolio_endpoint(
 @router.get("/portfolios", response_model=list[PortfolioResponse])
 async def list_portfolios_endpoint(
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[PortfolioResponse]:
     portfolios = await list_portfolios(session, user_id)
     return [PortfolioResponse.model_validate(p) for p in portfolios]
@@ -59,7 +59,7 @@ async def list_portfolios_endpoint(
 async def get_portfolio_endpoint(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> PortfolioResponse:
     p = await get_portfolio(session, portfolio_id, user_id)
     return PortfolioResponse.model_validate(p)
@@ -94,7 +94,7 @@ async def add_position_endpoint(
 async def list_positions_endpoint(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[PositionResponse]:
     items = await get_positions(session, portfolio_id, user_id)
     return [PositionResponse.model_validate(i) for i in items]
@@ -118,7 +118,7 @@ async def delete_position_endpoint(
 async def analytics_endpoint(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     return await get_analytics(session, portfolio_id, user_id)
 
@@ -127,7 +127,7 @@ async def analytics_endpoint(
 async def sectors_endpoint(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[dict]:
     return await get_sector_allocation(session, portfolio_id, user_id)
 
@@ -139,7 +139,7 @@ async def transactions_endpoint(
     portfolio_id: uuid.UUID,
     limit: int = Query(100, ge=1, le=1000),
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[TransactionResponse]:
     txs = await get_transactions(session, portfolio_id, user_id, limit=limit)
     return [TransactionResponse.model_validate(t) for t in txs]
@@ -149,7 +149,7 @@ async def transactions_endpoint(
 async def export_endpoint(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> PlainTextResponse:
     csv_data = await export_transactions_csv(session, portfolio_id, user_id)
     return PlainTextResponse(

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
 from shared.config import settings
-from shared.database import get_session
+from shared.database import get_read_session, get_session
 
 from schemas.auth import (
     ChangePasswordRequest,
@@ -85,7 +85,7 @@ async def refresh_endpoint(
 @router.get("/me", response_model=UserResponse)
 async def get_me(
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> UserResponse:
     user = await get_user_by_id(session, user_id)
     return UserResponse.model_validate(user)

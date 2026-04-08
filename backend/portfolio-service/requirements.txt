@@ -5,3 +5,4 @@ asyncpg==0.31.0
 greenlet==3.3.2
 pydantic-settings==2.13.1
 structlog==25.1.0
+sentry-sdk[fastapi]==2.29.1

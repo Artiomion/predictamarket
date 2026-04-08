@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
-from shared.database import get_session
+from shared.database import get_read_session, get_session
 
 from schemas.portfolio import (
     AddWatchlistItemRequest,
@@ -40,7 +40,7 @@ async def create_watchlist_endpoint(
 @router.get("/watchlists", response_model=list[WatchlistResponse])
 async def list_watchlists_endpoint(
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> list[WatchlistResponse]:
     wls = await list_watchlists(session, user_id)
     return [WatchlistResponse.model_validate(w) for w in wls]
@@ -50,7 +50,7 @@ async def list_watchlists_endpoint(
 async def get_watchlist_endpoint(
     watchlist_id: uuid.UUID,
     user_id: uuid.UUID = Depends(require_user_id),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     return await get_watchlist_detail(session, watchlist_id, user_id)
 
