@@ -130,6 +130,12 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DEBUG=false
       - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,6 +159,12 @@ services:
       - TRANSFORMERS_CACHE=/app/.cache/huggingface
     volumes:
       - ./models:/models:ro
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 1g
     depends_on:
       postgres:
         condition: service_healthy
