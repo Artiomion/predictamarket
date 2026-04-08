@@ -1,0 +1,225 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: predictamarket-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: predictamarket
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d predictamarket"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: predictamarket-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: predictamarket-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@predictamarket.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Backend services (uncomment when ready)
+  # ---------------------------------------------------------------------------
+
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
+    container_name: predictamarket-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - MARKET_SERVICE_URL=http://market-data-service:8002
+      - NEWS_SERVICE_URL=http://news-service:8003
+      - FORECAST_SERVICE_URL=http://forecast-service:8004
+      - PORTFOLIO_SERVICE_URL=http://portfolio-service:8005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8006
+      - EDGAR_SERVICE_URL=http://edgar-service:8007
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: auth-service/Dockerfile
+    container_name: predictamarket-auth
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  market-data-service:
+    build:
+      context: ./backend
+      dockerfile: market-data-service/Dockerfile
+    container_name: predictamarket-market-data
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  news-service:
+    build:
+      context: ./backend
+      dockerfile: news-service/Dockerfile
+    container_name: predictamarket-news
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  forecast-service:
+    build:
+      context: ./backend
+      dockerfile: forecast-service/Dockerfile
+    container_name: predictamarket-forecast
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+      - MODELS_DIR=/models
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    volumes:
+      - ./models:/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  portfolio-service:
+    build:
+      context: ./backend
+      dockerfile: portfolio-service/Dockerfile
+    container_name: predictamarket-portfolio
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./backend
+      dockerfile: notification-service/Dockerfile
+    container_name: predictamarket-notification
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  edgar-service:
+    build:
+      context: ./backend
+      dockerfile: edgar-service/Dockerfile
+    container_name: predictamarket-edgar
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: predictamarket_postgres_data
+  redis_data:
+    name: predictamarket_redis_data
+  pgadmin_data:
+    name: predictamarket_pgadmin_data
