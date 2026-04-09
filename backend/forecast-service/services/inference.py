@@ -288,11 +288,14 @@ def _fetch_news_sentiment_sync(
 
 # ── Variable importance ──────────────────────────────────────────────────────
 
-def _extract_variable_importance(tft_model, infer_dl, config, signal, current_close, median_1d, top_n=5):
+def _extract_variable_importance(tft_model, infer_dl, config, signal, current_close, median_1d, raw_output=None, top_n=5):
     try:
-        interpretation = tft_model.interpret_output(
-            tft_model.predict(infer_dl, mode="raw"), reduction="sum"
-        )
+        if raw_output is None:
+            batch = next(iter(infer_dl))
+            x, _ = batch
+            with torch.no_grad():
+                raw_output = tft_model(x)
+        interpretation = tft_model.interpret_output(raw_output, reduction="sum")
         enc_weights = interpretation.get("encoder_variables")
         if enc_weights is not None:
             enc_weights = enc_weights.detach().cpu().numpy().flatten()
@@ -390,7 +393,15 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
     df["sector"] = config["sectors"].get(ticker.lower(), "N/A")
     df["day_of_week"] = df["Date"].dt.dayofweek.astype(str)
     df["month"] = df["Date"].dt.month.astype(str)
-    df["time_idx"] = range(len(df))
+
+    # time_idx must continue from training data sequence.
+    # Training: 2000-03-14 to 2024-10-31, ~6428 trading days (time_idx 0..6427).
+    # Live data continues from 6428+.
+    # Calculate offset: trading days from training start to first row of our data.
+    _TRAIN_START = pd.Timestamp("2000-03-14")
+    first_date = df["Date"].iloc[0]
+    offset = len(pd.bdate_range(_TRAIN_START, first_date)) - 1
+    df["time_idx"] = range(offset, offset + len(df))
 
     for col in config["static_categoricals"] + config["time_varying_known_categoricals"]:
         df[col] = df[col].astype(str)
@@ -399,7 +410,9 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
 
     needed = config["max_encoder_length"] + config["max_prediction_length"]
     df = df.tail(needed).reset_index(drop=True)
-    df["time_idx"] = range(len(df))
+    # Preserve time_idx values (don't reset to 0)
+    time_idx_start = df["time_idx"].iloc[0]
+    df["time_idx"] = range(time_idx_start, time_idx_start + len(df))
 
     # 5. Predict
     try:
@@ -410,8 +423,14 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
         infer_ds = TimeSeriesDataSet.from_dataset(training_ds, df, predict=True, stop_randomization=True)
         infer_dl = infer_ds.to_dataloader(train=False, batch_size=1, num_workers=0)
 
-        raw = tft_model.predict(infer_dl, mode="raw")
-        q = raw["prediction"][0].detach().cpu().numpy()
+        # Use direct forward pass instead of predict() — Lightning's predict()
+        # applies inverse transform via GroupNormalizer which produces NaN
+        # on data outside training distribution.
+        batch = next(iter(infer_dl))
+        x, _ = batch
+        with torch.no_grad():
+            raw_output = tft_model(x)
+        q = raw_output["prediction"][0].detach().cpu().numpy()  # (22, 7)
     except Exception as e:
         return {"error": f"Prediction failed: {e}"}
 
@@ -456,7 +475,7 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
     predicted_return_1w = round((float(q[4, 3]) / current_close - 1) * 100, 2) if len(q) > 4 and current_close else None
     predicted_return_1m = round((float(q[21, 3]) / current_close - 1) * 100, 2) if len(q) > 21 and current_close else None
 
-    top_factors = _extract_variable_importance(tft_model, _infer_dl_ref, config, signal, current_close, median_1d)
+    top_factors = _extract_variable_importance(tft_model, _infer_dl_ref, config, signal, current_close, median_1d, raw_output=raw_output)
 
     def _safe(v):
         if v is None:
