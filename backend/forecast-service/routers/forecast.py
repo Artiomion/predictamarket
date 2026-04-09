@@ -117,6 +117,17 @@ async def create_forecast(
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
 
+    # Sanitize NaN/Inf → 0.0 for JSON + Pydantic compatibility
+    def _sanitize(obj):
+        if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+            return 0.0
+        if isinstance(obj, dict):
+            return {k: _sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_sanitize(v) for v in obj]
+        return obj
+    result = _sanitize(result)
+
     try:
         await store_forecast(session, result)
     except Exception as exc:

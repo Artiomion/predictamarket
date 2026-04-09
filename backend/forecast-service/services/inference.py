@@ -37,25 +37,67 @@ def _compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
+def _fetch_price_from_db_sync(ticker: str, lookback_days: int = 365) -> pd.DataFrame | None:
+    """Fetch OHLCV from our PostgreSQL price_history (no external API call).
+    Uses synchronous psycopg2 to avoid async-from-sync issues in thread pool."""
+    try:
+        import psycopg2
+        from shared.config import settings
+
+        # Convert async URL to sync: postgresql+asyncpg:// → postgresql://
+        db_url = settings.DATABASE_URL.replace("+asyncpg", "")
+
+        cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT date, open, high, low, close, volume FROM market.price_history "
+            "WHERE ticker = %s AND date >= %s ORDER BY date ASC",
+            (ticker, cutoff),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows or len(rows) < 60:
+            return None
+
+        df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+        df["Date"] = pd.to_datetime(df["Date"]).dt.normalize()
+        return df
+    except Exception as exc:
+        structlog.get_logger().warning("db_price_fallback_error", ticker=ticker, error=str(exc))
+        return None
+
+
 def _fetch_price_data_sync(ticker: str, lookback_days: int = 365) -> pd.DataFrame | None:
-    """Fetch OHLCV + technical features from yfinance with retry + timeout."""
+    """Fetch OHLCV: yfinance primary (freshest data), DB fallback (when rate limited)."""
+
+    # 1. Try yfinance (freshest real-time data)
     end = datetime.now()
     start = end - timedelta(days=lookback_days)
-
+    df = None
     try:
-        df = yf_download(ticker, start=start.strftime("%Y-%m-%d"))
+        raw = yf_download(ticker, start=start.strftime("%Y-%m-%d"))
+        if len(raw) > 0:
+            df = raw.reset_index()
+            if isinstance(df.columns[0], tuple):
+                df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+            df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None).dt.normalize()
+            structlog.get_logger().info("price_from_yfinance", ticker=ticker, rows=len(df))
     except YFinanceError as exc:
-        structlog.get_logger().error("price_fetch_failed", ticker=ticker, error=str(exc))
-        return None
-    if len(df) == 0:
-        return None
+        structlog.get_logger().warning("yfinance_blocked", ticker=ticker, error=str(exc))
 
-    df = df.reset_index()
-    # Handle multi-level columns from yfinance
-    if isinstance(df.columns[0], tuple):
-        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+    # 2. Fallback to DB when yfinance is rate-limited or down
+    if df is None or len(df) < 120:
+        db_df = _fetch_price_from_db_sync(ticker, lookback_days)
+        if db_df is not None and len(db_df) >= 120:
+            df = db_df
+            structlog.get_logger().info("price_from_db_fallback", ticker=ticker, rows=len(df))
 
-    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None).dt.normalize()
+    if df is None or len(df) == 0:
+        return None
 
     # Technical features matching config's time_varying_unknown_reals
     df["log_return"] = np.log(df["Close"] / df["Close"].shift(1))
@@ -74,17 +116,34 @@ def _fetch_price_data_sync(ticker: str, lookback_days: int = 365) -> pd.DataFram
     # 52-week proximity
     high_52 = df["High"].rolling(252, min_periods=60).max()
     low_52 = df["Low"].rolling(252, min_periods=60).min()
-    df["pct_from_52wk_high"] = (df["Close"] - high_52) / high_52
-    df["pct_from_52wk_low"] = (df["Close"] - low_52) / low_52
+    df["pct_from_52wk_high"] = ((df["Close"] - high_52) / high_52).fillna(0)
+    df["pct_from_52wk_low"] = ((df["Close"] - low_52) / low_52).fillna(0)
 
     # Capital Gains (proxy: adj_close change)
-    df["Capital Gains"] = df["Close"].pct_change()
+    df["Capital Gains"] = df["Close"].pct_change().fillna(0)
 
     return df.dropna(subset=["ma_50"]).reset_index(drop=True)
 
 
 def _fetch_macro_data_sync(lookback_days: int = 200) -> pd.DataFrame | None:
-    """Fetch macro features from yfinance."""
+    """Fetch macro features — cached in Redis for 1 hour to avoid yfinance rate limits."""
+    import json as _json
+    import asyncio as _aio
+    from shared.redis_client import redis_client as _redis
+
+    # Try Redis cache first
+    try:
+        loop = _aio.new_event_loop()
+        cached = loop.run_until_complete(_redis.get("forecast:macro_cache"))
+        loop.close()
+        if cached:
+            df = pd.read_json(cached)
+            if len(df) > 50:
+                structlog.get_logger().info("macro_from_cache", rows=len(df))
+                return df
+    except Exception:
+        pass
+
     end = datetime.now()
     start = end - timedelta(days=lookback_days)
 
@@ -121,7 +180,18 @@ def _fetch_macro_data_sync(lookback_days: int = 200) -> pd.DataFrame | None:
     except Exception:
         macro["vix_contango"] = 0.0
 
-    return macro.dropna().reset_index().rename(columns={"index": "Date", "Date": "Date"})
+    result = macro.dropna().reset_index().rename(columns={"index": "Date", "Date": "Date"})
+
+    # Cache macro in Redis for 1 hour (same for all tickers)
+    try:
+        loop = _aio.new_event_loop()
+        loop.run_until_complete(_redis.set("forecast:macro_cache", result.to_json(), ex=3600))
+        loop.close()
+        structlog.get_logger().info("macro_cached", rows=len(result))
+    except Exception:
+        pass
+
+    return result
 
 
 def _fetch_news_and_sentiment_sync(
@@ -332,12 +402,17 @@ def _run_inference_sync(
     except Exception as e:
         return {"error": f"Prediction failed: {e}"}
 
+    # Replace NaN/Inf with 0 in predictions
+    q = np.nan_to_num(q, nan=0.0, posinf=0.0, neginf=0.0)
+
     # Keep reference for variable importance extraction
     _infer_dl_ref = infer_dl
 
     elapsed = time.time() - t0
     # Current close = last real price in the DataFrame (today or most recent trading day)
     current_close = float(df["Close"].iloc[-1])
+    if np.isnan(current_close) or current_close <= 0:
+        current_close = float(df["Close"].dropna().iloc[-1])
 
     # Signal logic (from CLAUDE.md)
     median_1d = float(q[0, 3])
@@ -382,19 +457,31 @@ def _run_inference_sync(
 # Extract real variable importance from TFT attention weights
     top_factors = _extract_variable_importance(tft_model, _infer_dl_ref, config, signal, current_close, median_1d)
 
+    def _safe(v: float | None) -> float | None:
+        """Replace NaN/Inf with None for JSON compatibility."""
+        if v is None:
+            return None
+        import math
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return v
+
     return {
         "ticker": ticker.upper(),
-        "current_close": round(current_close, 2),
+        "current_close": _safe(round(current_close, 2)),
         "signal": signal,
         "confidence": confidence,
-        "forecast": forecast,
-        "full_curve": [round(float(q[i, 3]), 2) for i in range(len(q))],
+        "forecast": {
+            k: {kk: _safe(vv) for kk, vv in v.items()} if v else None
+            for k, v in forecast.items()
+        },
+        "full_curve": [_safe(round(float(q[i, 3]), 2)) for i in range(len(q))],
         "variable_importance": {"top_factors": top_factors},
         "inference_time_s": round(elapsed, 2),
         "forecast_date": datetime.now().strftime("%Y-%m-%d"),
-        "predicted_return_1d": predicted_return_1d,
-        "predicted_return_1w": predicted_return_1w,
-        "predicted_return_1m": predicted_return_1m,
+        "predicted_return_1d": _safe(predicted_return_1d),
+        "predicted_return_1w": _safe(predicted_return_1w),
+        "predicted_return_1m": _safe(predicted_return_1m),
         "news_articles_used": len(sentiment) if isinstance(sentiment, pd.DataFrame) and len(sentiment) > 0 else 0,
     }
 
