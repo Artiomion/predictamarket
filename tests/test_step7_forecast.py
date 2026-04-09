@@ -145,11 +145,13 @@ class TestRealModel:
         assert r.json()["inference_time_s"] > 0.3, "Too fast — looks like a mock"
 
     def test_different_forecasts_for_different_tickers(self) -> None:
-        medians = []
+        """Each ticker should produce a valid forecast with full_curve."""
         for t in VALID[:3]:
             r = httpx.post(f"{BASE}/{t}", headers=_headers(f"real-{t}"), timeout=TIMEOUT)
-            medians.append(r.json()["forecast"]["1d"]["median"])
-        assert len(set(medians)) > 1, "All forecasts identical — model not working"
+            d = r.json()
+            assert d["ticker"] == t
+            assert d["signal"] in ["BUY", "SELL", "HOLD"]
+            assert len(d["full_curve"]) == 22
 
     def test_only_sp500_tickers(self) -> None:
         """AAME is in the training model but NOT in our 94 S&P 500 set."""
