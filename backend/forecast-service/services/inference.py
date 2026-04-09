@@ -44,8 +44,116 @@ def _compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
 
 # ── Data fetchers (all from DB) ──────────────────────────────────────────────
 
+def _backfill_fresh_prices(ticker: str) -> None:
+    """Fetch latest 5 days from yfinance and upsert into price_history.
+    Ensures DB has the most current data before inference."""
+    try:
+        import yfinance as yf
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        hist = yf.download(ticker, period="5d", progress=False, timeout=10)
+        if hist is None or len(hist) == 0:
+            return
+
+        hist = hist.reset_index()
+        if isinstance(hist.columns[0], tuple):
+            hist.columns = [c[0] if isinstance(c, tuple) else c for c in hist.columns]
+
+        conn = psycopg2.connect(_get_db_url(), connect_timeout=5)
+        cur = conn.cursor()
+
+        # Get instrument_id
+        cur.execute("SELECT id FROM market.instruments WHERE ticker = %s", (ticker,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return
+        inst_id = row[0]
+
+        for _, r in hist.iterrows():
+            trade_date = r["Date"].date() if hasattr(r["Date"], "date") else r["Date"]
+            close_val = float(r["Close"]) if r["Close"] == r["Close"] else None
+            if not close_val:
+                continue
+            cur.execute(
+                "INSERT INTO market.price_history (id, instrument_id, ticker, date, open, high, low, close, volume) "
+                "VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (ticker, date) DO UPDATE SET close = EXCLUDED.close, "
+                "open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, volume = EXCLUDED.volume",
+                (str(inst_id), ticker, trade_date,
+                 float(r["Open"]) if r["Open"] == r["Open"] else None,
+                 float(r["High"]) if r["High"] == r["High"] else None,
+                 float(r["Low"]) if r["Low"] == r["Low"] else None,
+                 close_val,
+                 int(r["Volume"]) if r["Volume"] == r["Volume"] else None),
+            )
+        conn.commit()
+        cur.close()
+        conn.close()
+        structlog.get_logger().info("prices_backfilled", ticker=ticker, rows=len(hist))
+    except Exception as exc:
+        structlog.get_logger().warning("backfill_prices_skipped", ticker=ticker, error=str(exc))
+
+
+def _backfill_fresh_macro() -> None:
+    """Fetch latest 5 days of macro from yfinance and upsert into macro_history."""
+    try:
+        import yfinance as yf
+
+        macro_map = {"^VIX": "vix", "^TNX": "treasury_10y", "^GSPC": "sp500",
+                     "DX-Y.NYB": "dxy", "GC=F": "gold", "CL=F": "oil"}
+        dfs = []
+        for symbol, name in macro_map.items():
+            try:
+                data = yf.download(symbol, period="5d", progress=False, timeout=10)
+                if len(data) > 0:
+                    dfs.append(data["Close"].squeeze().rename(name))
+            except Exception:
+                pass
+
+        if not dfs:
+            return
+
+        macro = pd.concat(dfs, axis=1).ffill()
+        macro.index = macro.index.tz_localize(None) if macro.index.tz else macro.index
+        if "vix" in macro.columns:
+            macro["vix_ma5"] = macro["vix"].rolling(5, min_periods=1).mean()
+        if "sp500" in macro.columns:
+            macro["sp500_return"] = np.log(macro["sp500"] / macro["sp500"].shift(1)).fillna(0)
+        macro["vix_contango"] = 0.0
+        macro = macro.dropna(subset=["vix", "sp500"]).reset_index()
+        macro.rename(columns={"index": "date", "Date": "date"}, inplace=True)
+
+        conn = psycopg2.connect(_get_db_url(), connect_timeout=5)
+        cur = conn.cursor()
+        for _, row in macro.iterrows():
+            d = row["date"].date() if hasattr(row["date"], "date") else row["date"]
+            vals = {c: (float(row[c]) if row[c] == row[c] else None) for c in
+                    ["vix", "treasury_10y", "sp500", "dxy", "gold", "oil", "vix_ma5", "sp500_return", "vix_contango"]
+                    if c in row.index}
+            cols = ", ".join(vals.keys())
+            placeholders = ", ".join(["%s"] * len(vals))
+            updates = ", ".join(f"{k} = EXCLUDED.{k}" for k in vals.keys())
+            cur.execute(
+                f"INSERT INTO market.macro_history (id, date, {cols}) "
+                f"VALUES (gen_random_uuid(), %s, {placeholders}) "
+                f"ON CONFLICT (date) DO UPDATE SET {updates}",
+                (d, *vals.values()),
+            )
+        conn.commit()
+        cur.close()
+        conn.close()
+        structlog.get_logger().info("macro_backfilled", rows=len(macro))
+    except Exception as exc:
+        structlog.get_logger().warning("backfill_macro_skipped", error=str(exc))
+
+
 def _fetch_price_data_sync(ticker: str, lookback_days: int = 365) -> pd.DataFrame | None:
-    """Fetch OHLCV from market.price_history + compute technicals."""
+    """Backfill fresh data from yfinance, then read from DB + compute technicals."""
+    # Backfill latest prices + macro before reading
+    _backfill_fresh_prices(ticker)
+    _backfill_fresh_macro()
+
     cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
     try:
