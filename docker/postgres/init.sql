@@ -113,6 +113,23 @@ CREATE INDEX idx_market_price_date ON market.price_history (date);
 CREATE INDEX idx_market_price_instrument ON market.price_history (instrument_id);
 CREATE INDEX idx_market_price_ticker_date ON market.price_history (ticker, date DESC);
 
+CREATE TABLE market.macro_history (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date            DATE NOT NULL UNIQUE,
+    vix             DOUBLE PRECISION,
+    treasury_10y    DOUBLE PRECISION,
+    sp500           DOUBLE PRECISION,
+    dxy             DOUBLE PRECISION,
+    gold            DOUBLE PRECISION,
+    oil             DOUBLE PRECISION,
+    vix_ma5         DOUBLE PRECISION,
+    sp500_return    DOUBLE PRECISION,
+    vix_contango    DOUBLE PRECISION,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_market_macro_date ON market.macro_history (date);
+
 CREATE TABLE market.financial_metrics (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     instrument_id   UUID NOT NULL REFERENCES market.instruments(id) ON DELETE CASCADE,

@@ -87,3 +87,19 @@ class CompanyProfile(BaseModel):
     founded_year: Mapped[int | None] = mapped_column(Integer)
 
     instrument: Mapped["Instrument"] = relationship(back_populates="profile")
+
+
+class MacroHistory(BaseModel):
+    __tablename__ = "macro_history"
+    __table_args__ = {"schema": "market"}
+
+    date: Mapped[date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    vix: Mapped[float | None] = mapped_column(Double)
+    treasury_10y: Mapped[float | None] = mapped_column(Double)
+    sp500: Mapped[float | None] = mapped_column(Double)
+    dxy: Mapped[float | None] = mapped_column(Double)
+    gold: Mapped[float | None] = mapped_column(Double)
+    oil: Mapped[float | None] = mapped_column(Double)
+    vix_ma5: Mapped[float | None] = mapped_column(Double)
+    sp500_return: Mapped[float | None] = mapped_column(Double)
+    vix_contango: Mapped[float | None] = mapped_column(Double)
