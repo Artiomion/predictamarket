@@ -92,9 +92,15 @@ class ModelArtifacts:
             from pytorch_forecasting import TemporalFusionTransformer
 
             ckpt_path = str(models_dir / ckpts[-1])
-            self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
-                ckpt_path, map_location="cpu", weights_only=False
-            )
+            try:
+                self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
+                    ckpt_path, map_location="cpu", weights_only=False
+                )
+            except TypeError:
+                # Older lightning doesn't support weights_only kwarg
+                self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
+                    ckpt_path, map_location="cpu"
+                )
             self.tft_model.eval()
 
             # 5. PCA model
