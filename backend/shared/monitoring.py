@@ -26,13 +26,19 @@ def init_sentry() -> None:
     try:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
-        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+        integrations = [FastApiIntegration()]
+        try:
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+            integrations.append(SqlalchemyIntegration())
+        except (ImportError, Exception):
+            pass  # SQLAlchemy not installed (e.g. api-gateway)
 
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
             environment=settings.APP_ENV,
             traces_sample_rate=0.1 if settings.APP_ENV == "production" else 1.0,
-            integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+            integrations=integrations,
         )
         logger.info("sentry_initialized", environment=settings.APP_ENV)
     except ImportError:

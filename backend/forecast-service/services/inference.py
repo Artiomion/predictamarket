@@ -336,7 +336,8 @@ def _run_inference_sync(
     _infer_dl_ref = infer_dl
 
     elapsed = time.time() - t0
-    current_close = float(df["Close"].iloc[-config["max_prediction_length"] - 1])
+    # Current close = last real price in the DataFrame (today or most recent trading day)
+    current_close = float(df["Close"].iloc[-1])
 
     # Signal logic (from CLAUDE.md)
     median_1d = float(q[0, 3])
