@@ -2,6 +2,7 @@
 
 import { Menu, Search, Bell } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useUIStore } from "@/store/ui-store"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
+  const { setCommandPaletteOpen } = useUIStore()
   const tierColors: Record<string, string> = {
     free: "secondary",
     pro: "default",
@@ -34,6 +36,7 @@ export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
       <div className="ml-auto flex items-center gap-2">
         {/* Search trigger */}
         <button
+          onClick={() => setCommandPaletteOpen(true)}
           className="rounded-button p-2 text-text-muted transition-colors duration-150 hover:bg-bg-surface hover:text-text-secondary"
           title="Search (Cmd+K)"
         >
