@@ -43,8 +43,8 @@ async def _redis_subscriber() -> None:
     """Subscribe to Redis pub/sub: news.high_impact, forecast.updated."""
     sub_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = sub_client.pubsub()
-    await pubsub.subscribe("news.high_impact", "forecast.updated")
-    await logger.ainfo("pubsub_subscribed", channels=["news.high_impact", "forecast.updated"])
+    await pubsub.subscribe("news.high_impact", "forecast.updated", "price.updated")
+    await logger.ainfo("pubsub_subscribed", channels=["news.high_impact", "forecast.updated", "price.updated"])
 
     try:
         while _running:
@@ -56,12 +56,21 @@ async def _redis_subscriber() -> None:
                 except (json.JSONDecodeError, TypeError):
                     continue
 
-                if channel == "news.high_impact":
+                if channel == "price.updated":
+                    ticker = data.get("ticker", "")
+                    if ticker:
+                        await emit_price_update(ticker, data)
+                        await logger.ainfo("pubsub_price", ticker=ticker, price=data.get("price"))
+
+                elif channel == "news.high_impact":
                     tickers = data.get("tickers", [])
                     await emit_news_high_impact(tickers, data)
                     await logger.ainfo("pubsub_news", tickers=tickers)
 
                 elif channel == "forecast.updated":
+                    ticker = data.get("ticker", "")
+                    if ticker:
+                        await emit_forecast_ready(ticker, data)
                     await logger.ainfo("pubsub_forecast", data=data)
 
             await asyncio.sleep(0.1)

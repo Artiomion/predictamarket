@@ -97,7 +97,10 @@ async def update_prices_for_ticker(
             "change_pct": change_pct,
             "updated_at": str(hist.index[-1].date() if hasattr(hist.index[-1], "date") else hist.index[-1]),
         }
-        await redis_client.set(f"mkt:price:{ticker}", json.dumps(price_data), ex=PRICE_CACHE_TTL)
+        price_json = json.dumps(price_data)
+        await redis_client.set(f"mkt:price:{ticker}", price_json, ex=PRICE_CACHE_TTL)
+        # Publish for real-time WebSocket delivery
+        await redis_client.publish("price.updated", price_json)
 
     return rows_upserted
 

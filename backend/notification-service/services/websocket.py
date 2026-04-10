@@ -67,7 +67,7 @@ async def subscribe_ticker(sid: str, data: dict) -> None:
     """Client joins a ticker room — public, no auth needed."""
     ticker = data.get("ticker", "").upper()
     if ticker:
-        sio.enter_room(sid, f"ticker:{ticker}")
+        await sio.enter_room(sid, f"ticker:{ticker}")
         await logger.ainfo("ws_subscribe_ticker", sid=sid, ticker=ticker)
 
 
@@ -75,7 +75,7 @@ async def subscribe_ticker(sid: str, data: dict) -> None:
 async def unsubscribe_ticker(sid: str, data: dict) -> None:
     ticker = data.get("ticker", "").upper()
     if ticker:
-        sio.leave_room(sid, f"ticker:{ticker}")
+        await sio.leave_room(sid, f"ticker:{ticker}")
 
 
 @sio.event
@@ -92,7 +92,7 @@ async def subscribe_user(sid: str, data: dict) -> None:
         await sio.emit("error", {"detail": "Cannot subscribe to another user's notifications"}, to=sid)
         return
 
-    sio.enter_room(sid, f"user:{requested_user_id}")
+    await sio.enter_room(sid, f"user:{requested_user_id}")
     await logger.ainfo("ws_subscribe_user", sid=sid, user_id=requested_user_id)
 
 
