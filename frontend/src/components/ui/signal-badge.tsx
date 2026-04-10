@@ -1,0 +1,60 @@
+"use client"
+
+import { motion } from "framer-motion"
+import { cn } from "@/lib/utils"
+import type { Signal, Confidence } from "@/types"
+
+const signalConfig = {
+  BUY: {
+    bg: "bg-[rgba(0,255,136,0.12)]",
+    text: "text-success",
+    glow: "group-hover:shadow-glow-success",
+  },
+  SELL: {
+    bg: "bg-[rgba(255,51,102,0.12)]",
+    text: "text-danger",
+    glow: "group-hover:shadow-glow-danger",
+  },
+  HOLD: {
+    bg: "bg-[rgba(255,184,0,0.12)]",
+    text: "text-warning",
+    glow: "",
+  },
+} as const
+
+interface SignalBadgeProps {
+  signal: Signal
+  confidence?: Confidence
+  showWinRate?: boolean
+  className?: string
+}
+
+export function SignalBadge({ signal, confidence, showWinRate, className }: SignalBadgeProps) {
+  const config = signalConfig[signal]
+  const isHighConfidence = confidence === "HIGH"
+
+  return (
+    <motion.span
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.97 }}
+      className={cn(
+        "group inline-flex items-center gap-1.5 rounded-chip px-2 py-0.5 text-xs font-medium font-mono transition-shadow duration-150",
+        config.bg,
+        config.text,
+        config.glow,
+        className
+      )}
+    >
+      {signal}
+      {isHighConfidence && showWinRate && signal === "BUY" && (
+        <span className="text-[10px] opacity-75">99.5% WR</span>
+      )}
+      {confidence && (
+        <span className="text-[10px] opacity-60">{confidence}</span>
+      )}
+    </motion.span>
+  )
+}
