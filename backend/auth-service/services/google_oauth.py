@@ -69,6 +69,10 @@ async def _verify_google_access_token(access_token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid Google access token")
 
     payload = resp.json()
+
+    if not payload.get("email_verified", False):
+        raise HTTPException(status_code=401, detail="Google email not verified")
+
     return {
         "sub": payload["sub"],
         "email": payload["email"].lower().strip(),

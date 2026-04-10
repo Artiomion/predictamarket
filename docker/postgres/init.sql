@@ -648,5 +648,24 @@ BEGIN
 END;
 $$;
 
+-- ======================= Composite partial index for price poller (CR-6) =====
+CREATE INDEX IF NOT EXISTS idx_alerts_ticker_active_triggered
+ON notification.alerts (ticker, is_active, is_triggered)
+WHERE is_active = TRUE AND is_triggered = FALSE AND deleted_at IS NULL;
+
+-- ======================= Additional constraints (TD-6) =======================
+ALTER TABLE earnings.earnings_results ADD CONSTRAINT uq_earnings_results_ticker_date UNIQUE (ticker, report_date);
+ALTER TABLE edgar.income_statements ADD CONSTRAINT uq_income_stmt_ticker_period UNIQUE (ticker, period_end);
+ALTER TABLE edgar.balance_sheets ADD CONSTRAINT uq_balance_sheet_ticker_period UNIQUE (ticker, period_end);
+ALTER TABLE edgar.cash_flows ADD CONSTRAINT uq_cash_flow_ticker_period UNIQUE (ticker, period_end);
+ALTER TABLE news.social_mentions ADD CONSTRAINT uq_social_platform_post UNIQUE (platform, post_id);
+
+-- ======================= Additional indexes (TD-8) ===========================
+CREATE INDEX IF NOT EXISTS idx_income_stmt_period_end ON edgar.income_statements (period_end DESC);
+CREATE INDEX IF NOT EXISTS idx_balance_sheet_period_end ON edgar.balance_sheets (period_end DESC);
+CREATE INDEX IF NOT EXISTS idx_cash_flow_period_end ON edgar.cash_flows (period_end DESC);
+CREATE INDEX IF NOT EXISTS idx_forecast_history_ticker_date ON forecast.forecast_history (ticker, forecast_date DESC);
+CREATE INDEX IF NOT EXISTS idx_financial_metrics_period ON market.financial_metrics (period_end, period_type);
+
 -- ======================= Grant search_path ===================================
 ALTER DATABASE predictamarket SET search_path TO public, auth, market, edgar, news, forecast, portfolio, earnings, insider, notification;

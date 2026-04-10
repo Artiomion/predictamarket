@@ -10,6 +10,7 @@ from shared.database import get_read_session, get_session
 from shared.rate_limit import check_rate_limit
 from shared.redis_client import redis_client
 from shared.tier_limits import FORECAST_DAILY_LIMITS, TOP_PICKS_LIMITS
+from shared.utils import sanitize_nan
 
 from schemas.forecast import (
     BatchJobResponse,
@@ -33,12 +34,17 @@ from services.model_loader import artifacts
 logger = structlog.get_logger()
 router = APIRouter()
 
+ONE_DAY_SECONDS = 86400
+BATCH_JOB_TTL_SECONDS = 3600
+BATCH_JOB_ID_LENGTH = 12
+FINBERT_BATCH_SIZE = 16
+FINBERT_MAX_LENGTH = 512
 
 
 async def _check_forecast_rate_limit(user_id: str, tier: str) -> None:
     limit = FORECAST_DAILY_LIMITS.get(tier, 1)
     key = f"fc:daily:{user_id}"
-    count, remaining, ttl = await check_rate_limit(key, limit, window_seconds=86400)
+    count, remaining, ttl = await check_rate_limit(key, limit, window_seconds=ONE_DAY_SECONDS)
     if count > limit:
         raise HTTPException(
             status_code=429,
@@ -69,7 +75,7 @@ async def signals(
     return [ForecastFromDB.model_validate(r) for r in rows]
 
 
-@router.post("/batch", response_model=BatchJobResponse)
+@router.post("/batch", response_model=BatchJobResponse, status_code=201)
 async def create_batch_forecast(
     body: BatchRequest,
     user_id: uuid.UUID = Depends(require_user_id),
@@ -78,11 +84,11 @@ async def create_batch_forecast(
     """Queue batch forecast job. Pro/Premium only."""
     if x_user_tier not in ("pro", "premium"):
         raise HTTPException(status_code=403, detail="Batch forecasting requires Pro or Premium tier")
-    job_id = uuid.uuid4().hex[:12]
+    job_id = uuid.uuid4().hex[:BATCH_JOB_ID_LENGTH]
     await redis_client.set(
         f"fc:batch:{job_id}",
         json.dumps({"status": "queued", "tickers": body.tickers, "completed": 0, "total": len(body.tickers)}),
-        ex=3600,
+        ex=BATCH_JOB_TTL_SECONDS,
     )
     return BatchJobResponse(job_id=job_id, status="queued", tickers=body.tickers)
 
@@ -98,7 +104,7 @@ async def get_batch_status(job_id: str) -> BatchJobStatus:
 
 # ── Ticker-specific routes ────────────────────────────────────────────────────
 
-@router.post("/{ticker}", response_model=ForecastResponse)
+@router.post("/{ticker}", response_model=ForecastResponse, status_code=201)
 async def create_forecast(
     ticker: str,
     user_id: uuid.UUID = Depends(require_user_id),
@@ -117,21 +123,15 @@ async def create_forecast(
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
 
-    # Sanitize NaN/Inf → 0.0 for JSON + Pydantic compatibility
-    def _sanitize(obj):
-        if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
-            return 0.0
-        if isinstance(obj, dict):
-            return {k: _sanitize(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [_sanitize(v) for v in obj]
-        return obj
-    result = _sanitize(result)
+    result = sanitize_nan(result)
 
     try:
         await store_forecast(session, result)
+        result["persisted"] = True
     except Exception as exc:
+        await session.rollback()
         await logger.aerror("store_forecast_error", ticker=ticker_upper, error=str(exc))
+        result["persisted"] = False
 
     return result
 

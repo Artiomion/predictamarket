@@ -27,7 +27,7 @@ def _headers(prefix: str, tier: str = "pro") -> dict:
 class TestForecastStructure:
     def test_response_shape(self) -> None:
         r = httpx.post(f"{BASE}/{VALID[0]}", headers=_headers("struct1"), timeout=TIMEOUT)
-        assert r.status_code == 200, f"Got {r.status_code}: {r.text[:200]}"
+        assert r.status_code == 201, f"Got {r.status_code}: {r.text[:200]}"
         d = r.json()
         for f in ["ticker", "current_close", "signal", "confidence", "forecast",
                    "full_curve", "variable_importance", "inference_time_s"]:
@@ -76,7 +76,7 @@ class TestRateLimiting:
     def test_free_tier_one_per_day(self) -> None:
         h = _headers("free-rl", tier="free")
         r1 = httpx.post(f"{BASE}/{VALID[0]}", headers=h, timeout=TIMEOUT)
-        assert r1.status_code == 200, "First free forecast should succeed"
+        assert r1.status_code == 201, "First free forecast should succeed"
         r2 = httpx.post(f"{BASE}/{VALID[1]}", headers=h, timeout=TIMEOUT)
         assert r2.status_code == 429, f"Second free forecast should be 429, got {r2.status_code}"
 
@@ -164,7 +164,10 @@ class TestPersistence:
         ticker = VALID[0]
         httpx.post(f"{BASE}/{ticker}", headers=_headers("persist1"), timeout=TIMEOUT)
 
-        conn = psycopg2.connect("postgresql://postgres:postgres@localhost:5432/predictamarket")
+        import os
+        dsn = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/predictamarket")
+        dsn = dsn.replace("+asyncpg", "")
+        conn = psycopg2.connect(dsn)
         cur = conn.cursor()
         cur.execute(
             "SELECT ticker, signal FROM forecast.forecasts WHERE ticker=%s ORDER BY created_at DESC LIMIT 1",

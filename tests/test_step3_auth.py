@@ -1,18 +1,20 @@
 import base64
 import json
 import time
+import uuid
 
 import httpx
 import pytest
 
 BASE = "http://localhost:8001/api/auth"
+_RUN = uuid.uuid4().hex[:8]  # unique per test run to avoid DB conflicts
 
 
 class TestRegister:
     def test_success(self) -> None:
         r = httpx.post(
             f"{BASE}/register",
-            json={"email": "alice@test.com", "password": "Password123!", "name": "Alice"},
+            json={"email": f"alice-{_RUN}@test.com", "password": "Password123!", "name": "Alice"},
         )
         assert r.status_code == 201
         assert "access_token" in r.json()
@@ -21,11 +23,11 @@ class TestRegister:
     def test_duplicate_email(self) -> None:
         httpx.post(
             f"{BASE}/register",
-            json={"email": "dup@test.com", "password": "Pass123!", "name": "A"},
+            json={"email": f"dup-{_RUN}@test.com", "password": "Pass123!", "name": "A"},
         )
         r = httpx.post(
             f"{BASE}/register",
-            json={"email": "dup@test.com", "password": "Pass123!", "name": "B"},
+            json={"email": f"dup-{_RUN}@test.com", "password": "Pass123!", "name": "B"},
         )
         assert r.status_code == 400
         assert "already" in r.json()["detail"].lower() or "exist" in r.json()["detail"].lower()
@@ -56,13 +58,13 @@ class TestLogin:
     def setup_method(self) -> None:
         httpx.post(
             f"{BASE}/register",
-            json={"email": "login@test.com", "password": "Pass123!", "name": "L"},
+            json={"email": f"login-{_RUN}@test.com", "password": "Pass123!", "name": "L"},
         )
 
     def test_success(self) -> None:
         r = httpx.post(
             f"{BASE}/login",
-            json={"email": "login@test.com", "password": "Pass123!"},
+            json={"email": f"login-{_RUN}@test.com", "password": "Pass123!"},
         )
         assert r.status_code == 200
         assert "access_token" in r.json()
@@ -70,7 +72,7 @@ class TestLogin:
     def test_wrong_password(self) -> None:
         r = httpx.post(
             f"{BASE}/login",
-            json={"email": "login@test.com", "password": "WrongPass!"},
+            json={"email": f"login-{_RUN}@test.com", "password": "WrongPass!"},
         )
         assert r.status_code == 401
 
@@ -86,7 +88,7 @@ class TestJWTPayload:
     def test_payload_fields(self) -> None:
         r = httpx.post(
             f"{BASE}/register",
-            json={"email": "jwt@test.com", "password": "Pass123!", "name": "JWT"},
+            json={"email": f"jwt-{_RUN}@test.com", "password": "Pass123!", "name": "JWT"},
         )
         token = r.json()["access_token"]
         # Decode payload without verification
@@ -107,7 +109,7 @@ class TestRefreshToken:
     def test_rotation(self) -> None:
         r = httpx.post(
             f"{BASE}/register",
-            json={"email": "refresh@test.com", "password": "Pass123!", "name": "R"},
+            json={"email": f"refresh-{_RUN}@test.com", "password": "Pass123!", "name": "R"},
         )
         old_refresh = r.json()["refresh_token"]
         # First refresh — OK
@@ -126,7 +128,7 @@ class TestRefreshToken:
 
 class TestChangePassword:
     def test_change_and_login_with_new(self) -> None:
-        email = "chpw@test.com"
+        email = f"chpw-{_RUN}@test.com"
         old_pw = "OldPass123!"
         new_pw = "NewPass456!"
         reg = httpx.post(

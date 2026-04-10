@@ -35,8 +35,9 @@ router = APIRouter()
 
 
 def _require_internal_key(x_internal_key: str | None = Header(None)) -> str:
-    """Verify internal service-to-service API key."""
-    if not x_internal_key or x_internal_key != settings.INTERNAL_API_KEY:
+    """Verify internal service-to-service API key (constant-time comparison)."""
+    import hmac
+    if not x_internal_key or not hmac.compare_digest(x_internal_key, settings.INTERNAL_API_KEY):
         raise HTTPException(status_code=403, detail="Forbidden: internal endpoint")
     return x_internal_key
 

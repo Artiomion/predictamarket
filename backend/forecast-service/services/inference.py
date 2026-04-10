@@ -11,6 +11,7 @@ Data flow:
 
 import asyncio
 import math
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -20,10 +21,17 @@ import psycopg2
 import structlog
 import torch
 import feedparser
+import requests
 
 from shared.config import settings
+from shared.utils import (
+    HORIZON_STEPS, Q_02, Q_10, Q_MEDIAN, Q_90, Q_98, sanitize_nan,
+)
 
 logger = structlog.get_logger()
+
+# Training start date for time_idx offset calculation
+_TRAIN_START = pd.Timestamp("2000-03-14")
 
 
 def _get_db_url() -> str:
@@ -49,7 +57,6 @@ def _backfill_fresh_prices(ticker: str) -> None:
     Ensures DB has the most current data before inference."""
     try:
         import yfinance as yf
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
         hist = yf.download(ticker, period="5d", progress=False, timeout=10)
         if hist is None or len(hist) == 0:
@@ -60,43 +67,57 @@ def _backfill_fresh_prices(ticker: str) -> None:
             hist.columns = [c[0] if isinstance(c, tuple) else c for c in hist.columns]
 
         conn = psycopg2.connect(_get_db_url(), connect_timeout=5)
-        cur = conn.cursor()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM market.instruments WHERE ticker = %s", (ticker,))
+            row = cur.fetchone()
+            if not row:
+                return
+            inst_id = row[0]
 
-        # Get instrument_id
-        cur.execute("SELECT id FROM market.instruments WHERE ticker = %s", (ticker,))
-        row = cur.fetchone()
-        if not row:
+            for _, r in hist.iterrows():
+                trade_date = r["Date"].date() if hasattr(r["Date"], "date") else r["Date"]
+                close_val = float(r["Close"]) if r["Close"] == r["Close"] else None
+                if not close_val:
+                    continue
+                cur.execute(
+                    "INSERT INTO market.price_history (id, instrument_id, ticker, date, open, high, low, close, volume) "
+                    "VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s) "
+                    "ON CONFLICT (ticker, date) DO UPDATE SET close = EXCLUDED.close, "
+                    "open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, volume = EXCLUDED.volume",
+                    (str(inst_id), ticker, trade_date,
+                     float(r["Open"]) if r["Open"] == r["Open"] else None,
+                     float(r["High"]) if r["High"] == r["High"] else None,
+                     float(r["Low"]) if r["Low"] == r["Low"] else None,
+                     close_val,
+                     int(r["Volume"]) if r["Volume"] == r["Volume"] else None),
+                )
+            conn.commit()
+            cur.close()
+            structlog.get_logger().info("prices_backfilled", ticker=ticker, rows=len(hist))
+        finally:
             conn.close()
-            return
-        inst_id = row[0]
-
-        for _, r in hist.iterrows():
-            trade_date = r["Date"].date() if hasattr(r["Date"], "date") else r["Date"]
-            close_val = float(r["Close"]) if r["Close"] == r["Close"] else None
-            if not close_val:
-                continue
-            cur.execute(
-                "INSERT INTO market.price_history (id, instrument_id, ticker, date, open, high, low, close, volume) "
-                "VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s) "
-                "ON CONFLICT (ticker, date) DO UPDATE SET close = EXCLUDED.close, "
-                "open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, volume = EXCLUDED.volume",
-                (str(inst_id), ticker, trade_date,
-                 float(r["Open"]) if r["Open"] == r["Open"] else None,
-                 float(r["High"]) if r["High"] == r["High"] else None,
-                 float(r["Low"]) if r["Low"] == r["Low"] else None,
-                 close_val,
-                 int(r["Volume"]) if r["Volume"] == r["Volume"] else None),
-            )
-        conn.commit()
-        cur.close()
-        conn.close()
-        structlog.get_logger().info("prices_backfilled", ticker=ticker, rows=len(hist))
     except Exception as exc:
         structlog.get_logger().warning("backfill_prices_skipped", ticker=ticker, error=str(exc))
 
 
+_MACRO_COLS = ("vix", "treasury_10y", "sp500", "dxy", "gold", "oil", "vix_ma5", "sp500_return", "vix_contango")
+
+# TTL cache: don't re-backfill more than once per 5 minutes
+_backfill_lock = threading.Lock()
+_last_backfill_prices: dict[str, float] = {}
+_last_backfill_macro: float = 0.0
+_BACKFILL_TTL = 300  # seconds
+
+
 def _backfill_fresh_macro() -> None:
     """Fetch latest 5 days of macro from yfinance and upsert into macro_history."""
+    global _last_backfill_macro
+    with _backfill_lock:
+        if time.time() - _last_backfill_macro < _BACKFILL_TTL:
+            return
+        _last_backfill_macro = time.time()  # claim slot under lock
+
     try:
         import yfinance as yf
 
@@ -108,8 +129,8 @@ def _backfill_fresh_macro() -> None:
                 data = yf.download(symbol, period="5d", progress=False, timeout=10)
                 if len(data) > 0:
                     dfs.append(data["Close"].squeeze().rename(name))
-            except Exception:
-                pass
+            except Exception as exc:
+                structlog.get_logger().warning("macro_symbol_failed", symbol=symbol, error=str(exc))
 
         if not dfs:
             return
@@ -125,33 +146,38 @@ def _backfill_fresh_macro() -> None:
         macro.rename(columns={"index": "date", "Date": "date"}, inplace=True)
 
         conn = psycopg2.connect(_get_db_url(), connect_timeout=5)
-        cur = conn.cursor()
-        for _, row in macro.iterrows():
-            d = row["date"].date() if hasattr(row["date"], "date") else row["date"]
-            vals = {c: (float(row[c]) if row[c] == row[c] else None) for c in
-                    ["vix", "treasury_10y", "sp500", "dxy", "gold", "oil", "vix_ma5", "sp500_return", "vix_contango"]
-                    if c in row.index}
-            cols = ", ".join(vals.keys())
-            placeholders = ", ".join(["%s"] * len(vals))
-            updates = ", ".join(f"{k} = EXCLUDED.{k}" for k in vals.keys())
-            cur.execute(
-                f"INSERT INTO market.macro_history (id, date, {cols}) "
-                f"VALUES (gen_random_uuid(), %s, {placeholders}) "
-                f"ON CONFLICT (date) DO UPDATE SET {updates}",
-                (d, *vals.values()),
-            )
-        conn.commit()
-        cur.close()
-        conn.close()
-        structlog.get_logger().info("macro_backfilled", rows=len(macro))
+        try:
+            cur = conn.cursor()
+            for _, row in macro.iterrows():
+                d = row["date"].date() if hasattr(row["date"], "date") else row["date"]
+                vals = {c: (float(row[c]) if row[c] == row[c] else None) for c in _MACRO_COLS
+                        if c in row.index}
+                cols = ", ".join(vals.keys())
+                placeholders = ", ".join(["%s"] * len(vals))
+                updates = ", ".join(f"{k} = EXCLUDED.{k}" for k in vals.keys())
+                cur.execute(
+                    f"INSERT INTO market.macro_history (id, date, {cols}) "
+                    f"VALUES (gen_random_uuid(), %s, {placeholders}) "
+                    f"ON CONFLICT (date) DO UPDATE SET {updates}",
+                    (d, *vals.values()),
+                )
+            conn.commit()
+            cur.close()
+            structlog.get_logger().info("macro_backfilled", rows=len(macro))
+        finally:
+            conn.close()
     except Exception as exc:
         structlog.get_logger().warning("backfill_macro_skipped", error=str(exc))
 
 
 def _fetch_price_data_sync(ticker: str, lookback_days: int = 365) -> pd.DataFrame | None:
     """Backfill fresh data from yfinance, then read from DB + compute technicals."""
-    # Backfill latest prices + macro before reading
-    _backfill_fresh_prices(ticker)
+    with _backfill_lock:
+        need_prices = time.time() - _last_backfill_prices.get(ticker, 0) >= _BACKFILL_TTL
+        if need_prices:
+            _last_backfill_prices[ticker] = time.time()
+    if need_prices:
+        _backfill_fresh_prices(ticker)
     _backfill_fresh_macro()
 
     cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
@@ -244,8 +270,10 @@ def _fetch_news_sentiment_sync(
     """Fetch RSS → FinBERT embeddings → PCA → daily sent_0..sent_31 + news_count."""
     url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
     try:
-        feed = feedparser.parse(url)
-    except Exception:
+        resp = requests.get(url, timeout=5)
+        feed = feedparser.parse(resp.text)
+    except Exception as exc:
+        structlog.get_logger().warning("rss_fetch_failed", ticker=ticker, error=str(exc))
         return pd.DataFrame(columns=["Date"] + [f"sent_{i}" for i in range(n_components)] + ["news_count"])
 
     articles = []
@@ -264,10 +292,12 @@ def _fetch_news_sentiment_sync(
     texts = [a["text"] for a in articles]
     dates = [a["date"] for a in articles]
 
+    _FINBERT_BATCH = 16
+    _FINBERT_MAX_LEN = 512
     all_emb = []
-    for i in range(0, len(texts), 16):
-        batch = texts[i:i + 16]
-        inputs = tokenizer(batch, padding=True, truncation=True, max_length=512, return_tensors="pt")
+    for i in range(0, len(texts), _FINBERT_BATCH):
+        batch = texts[i:i + _FINBERT_BATCH]
+        inputs = tokenizer(batch, padding=True, truncation=True, max_length=_FINBERT_MAX_LEN, return_tensors="pt")
         with torch.no_grad():
             outputs = finbert_model(**inputs)
             cls = outputs.last_hidden_state[:, 0, :].cpu().numpy()
@@ -310,15 +340,15 @@ def _extract_variable_importance(tft_model, infer_dl, config, signal, current_cl
                 direction = ("bullish" if weight > 0 else "bearish") if signal == "BUY" else ("bearish" if weight > 0 else "bullish")
                 factors.append({"name": name, "weight": w, "direction": direction})
             return factors
-    except Exception:
-        pass
+    except Exception as exc:
+        structlog.get_logger().warning("variable_importance_failed", error=str(exc))
 
     return [
-        {"name": "momentum_20d", "weight": 0.18, "direction": "bullish" if signal == "BUY" else "bearish"},
-        {"name": "rsi_14", "weight": 0.15, "direction": "bullish" if median_1d > current_close else "bearish"},
-        {"name": "vix", "weight": 0.12, "direction": "bearish" if signal == "BUY" else "bullish"},
-        {"name": "ma_50", "weight": 0.09, "direction": "neutral"},
-        {"name": "sp500_return", "weight": 0.08, "direction": "neutral"},
+        {"name": "momentum_20d", "weight": 0.18, "direction": "bullish" if signal == "BUY" else "bearish", "is_estimated": True},
+        {"name": "rsi_14", "weight": 0.15, "direction": "bullish" if median_1d > current_close else "bearish", "is_estimated": True},
+        {"name": "vix", "weight": 0.12, "direction": "bearish" if signal == "BUY" else "bullish", "is_estimated": True},
+        {"name": "ma_50", "weight": 0.09, "direction": "neutral", "is_estimated": True},
+        {"name": "sp500_return", "weight": 0.08, "direction": "neutral", "is_estimated": True},
     ]
 
 
@@ -397,8 +427,6 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
     # time_idx must continue from training data sequence.
     # Training: 2000-03-14 to 2024-10-31, ~6428 trading days (time_idx 0..6427).
     # Live data continues from 6428+.
-    # Calculate offset: trading days from training start to first row of our data.
-    _TRAIN_START = pd.Timestamp("2000-03-14")
     first_date = df["Date"].iloc[0]
     offset = len(pd.bdate_range(_TRAIN_START, first_date)) - 1
     df["time_idx"] = range(offset, offset + len(df))
@@ -443,9 +471,9 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
         current_close = float(df["Close"].dropna().iloc[-1])
 
     # Signal logic
-    median_1d = float(q[0, 3])
-    lower_80_1d = float(q[0, 1])
-    upper_80_1d = float(q[0, 5])
+    median_1d = float(q[0, Q_MEDIAN])
+    lower_80_1d = float(q[0, Q_10])
+    upper_80_1d = float(q[0, Q_90])
 
     signal = "BUY" if median_1d > current_close else "SELL"
     if lower_80_1d > current_close:
@@ -458,47 +486,40 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
     else:
         confidence = "MEDIUM"
 
-    def _horizon(step):
+    def _horizon(step: int) -> dict | None:
         if step >= len(q):
             return None
         return {
-            "median": round(float(q[step, 3]), 2),
-            "lower_80": round(float(q[step, 1]), 2),
-            "upper_80": round(float(q[step, 5]), 2),
-            "lower_95": round(float(q[step, 0]), 2),
-            "upper_95": round(float(q[step, 6]), 2),
+            "median": round(float(q[step, Q_MEDIAN]), 2),
+            "lower_80": round(float(q[step, Q_10]), 2),
+            "upper_80": round(float(q[step, Q_90]), 2),
+            "lower_95": round(float(q[step, Q_02]), 2),
+            "upper_95": round(float(q[step, Q_98]), 2),
         }
 
-    forecast = {"1d": _horizon(0), "3d": _horizon(2), "1w": _horizon(4), "2w": _horizon(9), "1m": _horizon(21)}
+    forecast = {label: _horizon(step) for label, step in HORIZON_STEPS.items()}
 
-    predicted_return_1d = round((float(q[0, 3]) / current_close - 1) * 100, 2) if current_close else None
-    predicted_return_1w = round((float(q[4, 3]) / current_close - 1) * 100, 2) if len(q) > 4 and current_close else None
-    predicted_return_1m = round((float(q[21, 3]) / current_close - 1) * 100, 2) if len(q) > 21 and current_close else None
+    predicted_return_1d = round((float(q[0, Q_MEDIAN]) / current_close - 1) * 100, 2) if current_close else None
+    predicted_return_1w = round((float(q[HORIZON_STEPS["1w"], Q_MEDIAN]) / current_close - 1) * 100, 2) if len(q) > HORIZON_STEPS["1w"] and current_close else None
+    predicted_return_1m = round((float(q[HORIZON_STEPS["1m"], Q_MEDIAN]) / current_close - 1) * 100, 2) if len(q) > HORIZON_STEPS["1m"] and current_close else None
 
     top_factors = _extract_variable_importance(tft_model, _infer_dl_ref, config, signal, current_close, median_1d, raw_output=raw_output)
 
-    def _safe(v):
-        if v is None:
-            return None
-        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
-            return 0.0
-        return v
-
-    return {
+    return sanitize_nan({
         "ticker": ticker.upper(),
-        "current_close": _safe(round(current_close, 2)),
+        "current_close": round(current_close, 2),
         "signal": signal,
         "confidence": confidence,
-        "forecast": {k: {kk: _safe(vv) for kk, vv in v.items()} if v else None for k, v in forecast.items()},
-        "full_curve": [_safe(round(float(q[i, 3]), 2)) for i in range(len(q))],
+        "forecast": {k: {kk: vv for kk, vv in v.items()} if v else None for k, v in forecast.items()},
+        "full_curve": [round(float(q[i, Q_MEDIAN]), 2) for i in range(len(q))],
         "variable_importance": {"top_factors": top_factors},
         "inference_time_s": round(elapsed, 2),
         "forecast_date": datetime.now().strftime("%Y-%m-%d"),
-        "predicted_return_1d": _safe(predicted_return_1d),
-        "predicted_return_1w": _safe(predicted_return_1w),
-        "predicted_return_1m": _safe(predicted_return_1m),
+        "predicted_return_1d": predicted_return_1d,
+        "predicted_return_1w": predicted_return_1w,
+        "predicted_return_1m": predicted_return_1m,
         "news_articles_used": len(sentiment) if isinstance(sentiment, pd.DataFrame) and len(sentiment) > 0 else 0,
-    }
+    })
 
 
 async def run_inference(ticker: str, artifacts) -> dict:

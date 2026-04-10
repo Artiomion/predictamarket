@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Double, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Double, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,7 +23,10 @@ class ModelVersion(BaseModel):
 
 class Forecast(BaseModel):
     __tablename__ = "forecasts"
-    __table_args__ = {"schema": "forecast"}
+    __table_args__ = (
+        Index("ix_forecasts_ticker_is_latest", "ticker", "is_latest"),
+        {"schema": "forecast"},
+    )
 
     instrument_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("market.instruments.id", ondelete="CASCADE"), nullable=False, index=True)
     model_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("forecast.model_versions.id", ondelete="CASCADE"), nullable=False)

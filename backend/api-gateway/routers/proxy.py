@@ -25,6 +25,11 @@ async def proxy_request(request: Request, path: str) -> Response:
     body = await request.body()
     headers = dict(request.headers)
 
+    # SECURITY: strip trusted headers that downstream services rely on —
+    # prevents unauthenticated clients from injecting x-user-id/x-user-tier
+    for h in ("x-user-id", "x-user-tier", "x-internal-key"):
+        headers.pop(h, None)
+
     # Inject user context from JWT middleware (set in request.state)
     user_id = getattr(request.state, "user_id", None)
     user_tier = getattr(request.state, "user_tier", None)

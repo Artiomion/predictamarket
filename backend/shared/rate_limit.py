@@ -1,6 +1,10 @@
 """Shared atomic rate limiter using Redis Lua script."""
 
+import structlog
+
 from shared.redis_client import redis_client
+
+logger = structlog.get_logger()
 
 _RATE_LIMIT_LUA = """
 local key = KEYS[1]
@@ -23,8 +27,9 @@ async def check_rate_limit(key: str, limit: int, window_seconds: int = 60) -> tu
         _script_sha = await redis_client.script_load(_RATE_LIMIT_LUA)
     try:
         count, ttl = await redis_client.evalsha(_script_sha, 1, key, window_seconds)
-    except Exception:
+    except Exception as exc:
         # Script evicted from Redis cache — reload
+        logger.warning("rate_limit_lua_reload", error=str(exc))
         _script_sha = None
         _script_sha = await redis_client.script_load(_RATE_LIMIT_LUA)
         count, ttl = await redis_client.evalsha(_script_sha, 1, key, window_seconds)

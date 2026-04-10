@@ -1,4 +1,5 @@
 # Shared base dependencies for all PredictaMarket microservices
+# Include via: -r ../requirements-base.txt
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
 sqlalchemy[asyncio]==2.0.49
@@ -7,3 +8,4 @@ greenlet==3.3.2
 redis[hiredis]==7.4.0
 pydantic-settings==2.13.1
 structlog==25.1.0
+sentry-sdk[fastapi]==2.29.1

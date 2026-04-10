@@ -97,11 +97,11 @@ async def add_watchlist_item(
     if not instrument_id:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not found")
 
-# Enforce item limit
+    # Enforce item limit
     item_limit = WATCHLIST_ITEM_LIMITS.get(tier, 10)
     item_count = await session.execute(
         select(func.count()).select_from(WatchlistItem).where(
-            # WatchlistItem.watchlist_id == watchlist_id
+            WatchlistItem.watchlist_id == watchlist_id
         )
     )
     if (item_count.scalar() or 0) >= item_limit:

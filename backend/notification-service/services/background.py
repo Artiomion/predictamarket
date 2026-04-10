@@ -34,7 +34,8 @@ async def _get_user_email(user_id: str) -> str | None:
                 select(User.email).where(User.id == user_id)
             )
             return result.scalar_one_or_none()
-    except Exception:
+    except Exception as exc:
+        structlog.get_logger().warning("user_email_lookup_failed", user_id=str(user_id), error=str(exc))
         return None
 
 
@@ -85,6 +86,8 @@ async def _price_poller() -> None:
                     await asyncio.sleep(15)
                     continue
 
+                # Collect prices from Redis first (no DB needed)
+                ticker_prices: list[tuple[str, float, dict]] = []
                 for ticker in alert_tickers:
                     raw = await price_client.get(f"mkt:price:{ticker}")
                     if not raw:
@@ -93,43 +96,40 @@ async def _price_poller() -> None:
                         data = json.loads(raw)
                     except (json.JSONDecodeError, TypeError):
                         continue
-
                     price = data.get("price", 0)
                     if not price:
                         continue
-
                     await emit_price_update(ticker, data)
+                    ticker_prices.append((ticker, price, data))
 
+                # Single session for all alert checks
+                if ticker_prices:
                     async with async_session_factory() as session:
-                        triggered = await check_price_alerts(session, ticker, price)
-                        if triggered:
-                            await session.commit()
-                            for alert, message in triggered:
-                                user_id_str = str(alert.user_id)
-
-                                # WebSocket notification
-                                await emit_alert_triggered(
-                                    user_id_str,
-                                    {"alert_id": str(alert.id), "ticker": ticker,
-                                     "message": message, "price": price},
-                                )
-
-                                # Email notification (non-blocking)
-                                email = await _get_user_email(user_id_str)
-                                if email:
-                                    asyncio.create_task(send_email(
-                                        to_email=email,
-                                        subject=f"Price Alert: {ticker}",
-                                        title=f"Price Alert: {ticker}",
-                                        body=message,
-                                        ticker=ticker,
-                                    ))
-
-                                await logger.ainfo(
-                                    "alert_triggered", alert_id=str(alert.id),
-                                    ticker=ticker, user_id=user_id_str,
-                                    email_sent=bool(email),
-                                )
+                        for ticker, price, data in ticker_prices:
+                            triggered = await check_price_alerts(session, ticker, price)
+                            if triggered:
+                                for alert, message in triggered:
+                                    user_id_str = str(alert.user_id)
+                                    await emit_alert_triggered(
+                                        user_id_str,
+                                        {"alert_id": str(alert.id), "ticker": ticker,
+                                         "message": message, "price": price},
+                                    )
+                                    email = await _get_user_email(user_id_str)
+                                    if email:
+                                        asyncio.create_task(send_email(
+                                            to_email=email,
+                                            subject=f"Price Alert: {ticker}",
+                                            title=f"Price Alert: {ticker}",
+                                            body=message,
+                                            ticker=ticker,
+                                        ))
+                                    await logger.ainfo(
+                                        "alert_triggered", alert_id=str(alert.id),
+                                        ticker=ticker, user_id=user_id_str,
+                                        email_sent=bool(email),
+                                    )
+                        await session.commit()
 
             except Exception as exc:
                 await logger.aerror("price_poll_error", error=str(exc))

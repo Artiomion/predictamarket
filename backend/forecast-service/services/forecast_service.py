@@ -7,10 +7,10 @@ from pathlib import Path
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from shared.models.forecast import Forecast, ForecastFactor, ForecastPoint, ModelVersion
 from shared.models.market import Instrument
+from shared.utils import HORIZON_LABELS
 
 logger = structlog.get_logger()
 
@@ -23,11 +23,11 @@ try:
     import os
     _tf = Path(os.environ.get("MODELS_DIR", str(_TICKERS_FILE.parent))) / "old_model_sp500_tickers.txt"
     VALID_TICKERS = {t.strip().upper() for t in _tf.read_text().strip().splitlines() if t.strip()}
-except Exception:
-    pass
+except Exception as exc:
+    logger.warning("valid_tickers_load_failed", error=str(exc), path=str(_TICKERS_FILE))
 
 
-async def get_or_create_model_version(session: AsyncSession) -> uuid.UUID:
+async def get_or_create_model_version(session: AsyncSession, checkpoint_name: str = "") -> uuid.UUID:
     result = await session.execute(
         select(ModelVersion).where(ModelVersion.is_active.is_(True)).limit(1)
     )
@@ -35,9 +35,11 @@ async def get_or_create_model_version(session: AsyncSession) -> uuid.UUID:
     if mv:
         return mv.id
 
+    # Derive version from checkpoint filename (e.g. "tft-epoch=02-val_loss=3.6789.ckpt")
+    version = checkpoint_name.replace(".ckpt", "") if checkpoint_name else "tft-unknown"
     mv = ModelVersion(
-        version="tft-v1-epoch02",
-        checkpoint_path="models/tft-epoch=02-val_loss=3.6789.ckpt",
+        version=version,
+        checkpoint_path=f"models/{checkpoint_name}" if checkpoint_name else "unknown",
         is_active=True,
         metrics={"mape_1d": 6.1, "win_rate": 99.5},
     )
@@ -57,7 +59,13 @@ async def store_forecast(session: AsyncSession, result: dict) -> Forecast:
     if not instrument_id:
         raise ValueError(f"Instrument {ticker} not found in DB")
 
-    model_version_id = await get_or_create_model_version(session)
+    # Get checkpoint name from model loader if available
+    try:
+        from services.model_loader import artifacts
+        ckpt = artifacts.checkpoint_name
+    except Exception:
+        ckpt = ""
+    model_version_id = await get_or_create_model_version(session, checkpoint_name=ckpt)
 
 # Single UPDATE statement instead of SELECT+loop
     await session.execute(
@@ -86,11 +94,9 @@ async def store_forecast(session: AsyncSession, result: dict) -> Forecast:
 # Bulk add forecast points
     full_curve = result.get("full_curve", [])
     forecast_data = result.get("forecast", {})
-    horizon_labels = {0: "1d", 2: "3d", 4: "1w", 9: "2w", 21: "1m"}
-
     points = []
     for step in range(len(full_curve)):
-        label = horizon_labels.get(step)
+        label = HORIZON_LABELS.get(step)
         horizon = forecast_data.get(label) if label else None
         points.append(ForecastPoint(
             forecast_id=forecast.id,

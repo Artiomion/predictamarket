@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -53,6 +54,8 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(JWTAuthMiddleware)
+# Trust X-Forwarded-For from reverse proxy — must be outermost (added last = runs first)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 app.include_router(health_router)
 app.include_router(metrics_router)

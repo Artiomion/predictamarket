@@ -9,7 +9,7 @@
 | **Тип проекта** | Pet-project |
 | **Назначение** | Веб-платформа для инвесторов — аналог CoinMarketCap для акций с AI-прогнозами |
 | **Уникальная фича** | Мультимодальный ML-прогноз + ранжирование акций + доверительные интервалы |
-| **Рынок** | S&P 500 (США) — 400 тикеров |
+| **Рынок** | S&P 500 (США) — 94 тикера (пересечение 400 обученных ∩ S&P 500) |
 
 ---
 
@@ -35,7 +35,7 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 
 ### Ключевые возможности (обзор)
 
-- Каталог 400 акций из S&P 500 с котировками в реальном времени
+- Каталог 94 акций из S&P 500 с котировками в реальном времени
 - AI-прогноз на горизонт 1д / 3д / 1нед / 2нед / 1мес / 3мес с доверительным интервалом 80% и 95%
 - **AI-ранжирование** — модель определяет какие акции вырастут больше других (Win Rate 99.5% на confident signals)
 - **Торговые сигналы**: BUY / SELL / HOLD с уровнем уверенности HIGH / LOW
@@ -408,7 +408,7 @@ predictamarket/
 | Функция | Лимит |
 |---|---|
 | Всё из Free + | |
-| AI-прогноз | 10 прогнозов/день, все 400 тикеров |
+| AI-прогноз | 10 прогнозов/день, все 94 тикера |
 | Top Picks | Топ-20 |
 | Портфель | 5 портфелей, безлимит позиций |
 | Watchlist | 5 вотчлистов, безлимит |
@@ -760,14 +760,14 @@ WebSocket (Socket.IO):
 | Тариф | Цена | Возможности |
 |---|---|---|
 | Free | $0 | 10 тикеров, 1 прогноз/день, 1 портфель (10 позиций), базовые индикаторы |
-| Pro | $15/мес ($144/год) | Все 400 тикеров, 10 прогнозов/день, 5 портфелей, Top Picks 20, полные фильтры, alerts |
+| Pro | $15/мес ($144/год) | Все 94 тикера, 10 прогнозов/день, 5 портфелей, Top Picks 20, полные фильтры, alerts |
 | Premium | $39/мес ($374/год) | Безлимит, Backtesting, API доступ, экспорт, priority inference, webhook alerts |
 
 ---
 
 ## 14. Текущий статус и план
 
-### Сделано ✅
+### Фаза 1: ML Foundation ✅
 - [x] EDA датасета (2638 тикеров, 12 секторов)
 - [x] Preprocessing: FinBERT embeddings, PCA, macro, FRED, earnings, insider, calendar
 - [x] Обновление данных до апреля 2026 (400 тикеров S&P 500)
@@ -776,53 +776,50 @@ WebSocket (Socket.IO):
 - [x] Backtesting: Confident Long WR 99.5%, Top-20 WR 100%
 - [x] Live inference pipeline (yfinance + RSS + FinBERT + TFT)
 - [x] Все 8 ноутбуков исправлены и протестированы
-- [x] Полная спецификация продукта (этот документ)
+- [x] 95% CI в output модели (квантили q0.02 и q0.98)
+- [ ] Walk-forward валидация (NB07) — отложено
+- [ ] Дообучение модели на 10-15 эпох (A100/H100) — отложено
 
-### В процессе 🔄
-- [ ] Дообучение TFT на 10-15 эпох с обновлёнными данными (A100/H100)
+### Фаза 2: Backend MVP ✅ ЗАВЕРШЕНА
+- [x] 8 микросервисов FastAPI (api-gateway, auth, market-data, news, forecast, portfolio, notification, edgar)
+- [x] PostgreSQL 15 — 9 схем, 33+ таблиц, 121+ индексов, UNIQUE constraints
+- [x] Redis 7 — кэш, rate limiting (Lua), pub/sub
+- [x] JWT auth + refresh token rotation (SHA256 hashed) + Google OAuth
+- [x] TFT inference (direct forward pass, ~5-6 сек, реальные прогнозы)
+- [x] FinBERT sentiment из RSS → PCA → DB
+- [x] Socket.IO WebSocket (price updates, alerts, forecast ready, news high impact)
+- [x] Rate limiting по тарифам (Redis Lua atomic INCR+EXPIRE)
+- [x] Docker Compose с healthcheck + resource limits на все 8 сервисов
+- [x] Sentry error tracking + Prometheus metrics
+- [x] 163 теста (22 unit + 141 integration), все зелёные
+- [x] 4 code review + 3 tech debt аудита — все критичные исправлены
+- [x] Безопасность: header injection fix, constant-time key comparison, JWT validator, ProxyHeadersMiddleware
+- [x] API документация: `docs/BACKEND_API.md` (66 эндпоинтов, все schemas)
 
-### Следующие шаги 📋
+**Backend реализует ВСЮ функциональность из Фаз 2 + 4:**
+Portfolio, Watchlist, Earnings, Insider, News с sentiment, SEC EDGAR, Push-уведомления — всё уже в backend API.
 
-**Фаза 1: ML Foundation (1-2 недели)**
-- [ ] Walk-forward валидация (NB07) — подтвердить стабильность модели
-- [ ] Дообучение модели (10-15 эпох)
-- [ ] Добавить 95% CI в output модели — ✅ тривиально: квантили 0.02 и 0.98 уже считаются моделью, нужно просто вытащить их в JSON как `lower_95` / `upper_95` (пара строк кода в inference pipeline)
-
-**Фаза 2: Backend MVP (2-3 недели)**
-- [ ] FastAPI forecast-service — обернуть live_inference() в API
-- [ ] auth-service — регистрация, JWT, роли
-- [ ] market-data-service — yfinance → PostgreSQL
-- [ ] PostgreSQL schema — все таблицы
-- [ ] Redis — кэш котировок, pub/sub
-- [ ] Docker Compose — контейнеризация
-
-**Фаза 3: Frontend MVP (3-4 недели)**
+### Фаза 3: Frontend MVP 🔄 ТЕКУЩАЯ
 - [ ] Next.js проект с дизайн-системой (цвета, типографика, компоненты)
 - [ ] Landing Page с live demo
 - [ ] Dashboard + каталог S&P 500
 - [ ] Страница тикера: график + прогноз + новости
 - [ ] Top Picks страница
-- [ ] Auth (login/register)
+- [ ] Auth (login/register/Google OAuth)
 - [ ] Command Palette (Cmd+K)
+- [ ] Portfolio management UI
+- [ ] Watchlist UI
+- [ ] News feed UI
+- [ ] Earnings Calendar UI
+- [ ] Notification center (WebSocket)
 
-**Фаза 4: Full Features (4-6 недель)**
-- [ ] Portfolio management (CRUD, analytics, P&L)
-- [ ] Watchlist
-- [ ] Earnings Calendar
-- [ ] Insider Transactions
-- [ ] News aggregator с фильтрами
-- [ ] SEC EDGAR integration
-- [ ] Финансовые показатели и отчётность
-- [ ] Push-уведомления (Socket.IO)
-
-**Фаза 5: Polish & Launch (2-3 недели)**
-- [ ] Анимации и micro-interactions
+### Фаза 4: Polish & Launch 📋
+- [ ] Анимации и micro-interactions (Framer Motion)
 - [ ] Performance optimization (lazy loading, virtualization)
 - [ ] Mobile responsive
 - [ ] Stripe integration (подписки)
-- [ ] Rate limiting по тарифам
 - [ ] Деплой MVP (VPS / Railway / AWS)
-- [ ] Monitoring (Sentry, Prometheus)
+- [ ] CI/CD (GitHub Actions — уже настроен)
 
 ---
 

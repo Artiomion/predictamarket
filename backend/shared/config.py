@@ -65,9 +65,16 @@ class Settings(BaseSettings):
     @field_validator("JWT_SECRET", "INTERNAL_API_KEY")
     @classmethod
     def no_placeholder_secrets(cls, v: str, info) -> str:
-        placeholders = {"change-me-in-production", "change-me-internal-key", "secret", ""}
-        if v.lower() in placeholders:
+        lowered = v.lower().strip()
+        blocked_exact = {"change-me-in-production", "change-me-internal-key", "secret", ""}
+        blocked_substrings = ("change-me", "changeme", "placeholder", "replace-me", "fixme")
+        if lowered in blocked_exact:
             raise ValueError(f"{info.field_name} must be set to a real secret, not a placeholder")
+        for sub in blocked_substrings:
+            if sub in lowered:
+                raise ValueError(f"{info.field_name} contains '{sub}' — use a real secret (openssl rand -hex 32)")
+        if len(v) < 16:
+            raise ValueError(f"{info.field_name} must be at least 16 characters for security")
         return v
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}

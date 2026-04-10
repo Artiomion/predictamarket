@@ -49,6 +49,7 @@ class ModelArtifacts:
         self.valid_tickers: set[str] = set()
         self.known_tickers: list[str] = []
         self.device = "cpu"
+        self.checkpoint_name: str = ""
 
     def _load_sync(self) -> None:
         """Load all artifacts. Runs in a thread."""
@@ -91,7 +92,8 @@ class ModelArtifacts:
 
             from pytorch_forecasting import TemporalFusionTransformer
 
-            ckpt_path = str(models_dir / ckpts[-1])
+            self.checkpoint_name = ckpts[-1]
+            ckpt_path = str(models_dir / self.checkpoint_name)
             try:
                 self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
                     ckpt_path, map_location="cpu", weights_only=False

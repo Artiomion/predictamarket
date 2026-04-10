@@ -1,12 +1,4 @@
-fastapi==0.115.12
-uvicorn[standard]==0.34.2
-sqlalchemy[asyncio]==2.0.49
-asyncpg==0.31.0
-greenlet==3.3.2
-redis[hiredis]==7.4.0
-pydantic-settings==2.13.1
-structlog==25.1.0
+-r ../requirements-base.txt
 python-socketio==5.12.1
 httpx==0.28.1
 python-jose[cryptography]==3.4.0
-sentry-sdk[fastapi]==2.29.1

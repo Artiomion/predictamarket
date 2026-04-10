@@ -1,0 +1,6 @@
+# Test dependencies — install via: pip install -r tests/requirements.txt
+pytest>=8.0
+httpx>=0.28
+psycopg2-binary>=2.9
+redis>=5.0
+python-jose[cryptography]>=3.4

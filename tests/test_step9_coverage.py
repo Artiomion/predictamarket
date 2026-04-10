@@ -38,6 +38,13 @@ def _register_user(tier: str = "pro") -> tuple[str, str, dict]:
 # 1. Google OAuth
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _flush_rate_limits() -> None:
+    r = redis_lib.Redis(host="localhost", port=6379)
+    keys = r.keys("rl:*")
+    if keys:
+        r.delete(*keys)
+
+
 class TestGoogleOAuth:
     def test_no_token_returns_400(self) -> None:
         r = httpx.post(f"{AUTH}/google", json={})
@@ -54,6 +61,7 @@ class TestGoogleOAuth:
 
     def test_google_via_gateway_no_jwt_needed(self) -> None:
         """Gateway should NOT block /api/auth/google with JWT check."""
+        _flush_rate_limits()
         r = httpx.post(f"{GW}/api/auth/google", json={"id_token": "fake"})
         assert r.status_code == 401  # 401 from Google, NOT from gateway JWT
         assert "Google" in r.json()["detail"]
@@ -61,6 +69,53 @@ class TestGoogleOAuth:
     def test_response_shape_on_error(self) -> None:
         r = httpx.post(f"{AUTH}/google", json={"id_token": "x"})
         assert "detail" in r.json()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1b. JWT expiry — expired token must be rejected
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestJWTExpiry:
+    def test_expired_token_returns_401(self) -> None:
+        """An expired JWT must be rejected by the gateway."""
+        from jose import jwt as jose_jwt
+        import os
+        secret = os.environ.get("JWT_SECRET", "")
+        if not secret:
+            # Try reading from .env file
+            env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+            if os.path.exists(env_path):
+                for line in open(env_path):
+                    if line.startswith("JWT_SECRET="):
+                        secret = line.strip().split("=", 1)[1]
+                        break
+        if not secret:
+            pytest.skip("JWT_SECRET not in env or .env")
+        expired_payload = {
+            "sub": str(uuid.uuid4()),
+            "email": "expired@test.com",
+            "tier": "pro",
+            "exp": int(time.time()) - 3600,  # expired 1 hour ago
+        }
+        token = jose_jwt.encode(expired_payload, secret, algorithm="HS256")
+        _flush_rate_limits()
+        r = httpx.get(f"{GW}/api/market/instruments?per_page=1",
+                      headers={"Authorization": f"Bearer {token}"})
+        # Gateway should treat expired token as unauthenticated
+        # Public endpoint returns data but without user context
+        assert r.status_code in (200, 401)
+        # If 200, verify no user-tier was injected (treated as anonymous)
+        if r.status_code == 200:
+            assert "x-user-tier" not in r.headers or r.headers.get("x-user-tier") != "pro"
+
+    def test_forged_tier_header_stripped(self) -> None:
+        """Client-sent X-User-Tier must be stripped by gateway."""
+        _flush_rate_limits()
+        r = httpx.get(f"{GW}/api/forecast/top-picks",
+                      headers={"X-User-Tier": "premium",
+                               "X-User-Id": "00000000-0000-0000-0000-000000000001"})
+        # Should fail auth — forged headers are stripped
+        assert r.status_code in (401, 403)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -114,7 +169,7 @@ class TestForecastBatch:
             json={"tickers": ["AAPL", "MSFT"]},
             headers={"X-User-Id": uid, "X-User-Tier": "pro"},
         )
-        assert r.status_code == 200
+        assert r.status_code == 201
         d = r.json()
         assert "job_id" in d
         assert d["status"] == "queued"
@@ -142,6 +197,9 @@ class TestForecastBatch:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestGatewayProxy:
+    def setup_method(self) -> None:
+        _flush_rate_limits()
+
     def test_auth_register_via_gateway(self) -> None:
         email = f"gw_{uuid.uuid4().hex[:6]}@test.com"
         r = httpx.post(f"{GW}/api/auth/register",

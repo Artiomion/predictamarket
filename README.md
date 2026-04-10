@@ -24,24 +24,40 @@ PostgreSQL 15    Redis 7 (cache + pub/sub)
 
 ```bash
 # 1. Clone and setup
-cp .env.example .env  # Fill in secrets
+cp .env.example .env
+# Edit .env: set JWT_SECRET and INTERNAL_API_KEY (openssl rand -hex 32)
 
 # 2. Start infrastructure
 docker compose up -d postgres redis pgadmin
 
-# 3. Initialize database (33 tables, 9 schemas)
-docker compose exec postgres psql -U postgres -d predictamarket -f /docker-entrypoint-initdb.d/init.sql
+# 3. Initialize database (33+ tables, 9 schemas, auto-runs on first start)
+# init.sql runs automatically via docker-entrypoint-initdb.d/
 
-# 4. Start backend services
-docker compose up -d api-gateway auth-service market-data-service
+# 4. Create Python environment
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements-base.txt
+pip install -r backend/forecast-service/requirements.txt  # heaviest (PyTorch + FinBERT)
 
 # 5. Seed data (94 S&P 500 tickers + 5y prices)
-PYTHONPATH=backend .venv/bin/python backend/market-data-service/scripts/seed_instruments.py
+PYTHONPATH=backend python backend/market-data-service/scripts/seed_instruments.py
 
-# 6. Run tests
-.venv/bin/pytest tests/test_unit.py -v          # 22 unit tests (no infra)
-.venv/bin/pytest tests/test_step3_auth.py -v    # 12 auth tests
+# 6. Start all 8 services
+PYTHONPATH=backend uvicorn main:app --port 8000 --app-dir backend/api-gateway &
+PYTHONPATH=backend uvicorn main:app --port 8001 --app-dir backend/auth-service &
+PYTHONPATH=backend uvicorn main:app --port 8002 --app-dir backend/market-data-service &
+PYTHONPATH=backend uvicorn main:app --port 8003 --app-dir backend/news-service &
+PYTHONPATH=backend uvicorn main:app --port 8004 --app-dir backend/forecast-service &
+PYTHONPATH=backend uvicorn main:app --port 8005 --app-dir backend/portfolio-service &
+PYTHONPATH=backend uvicorn main:socket_app --port 8006 --app-dir backend/notification-service &
+PYTHONPATH=backend uvicorn main:app --port 8007 --app-dir backend/edgar-service &
+
+# 7. Run tests
+pip install -r tests/requirements.txt
+pytest tests/test_unit.py -v          # 22 unit tests (no infra needed)
+PYTHONPATH=backend pytest tests/ -v   # All 163 tests (requires running services)
 ```
+
+> **Note:** notification-service uses `main:socket_app` (not `main:app`) for Socket.IO support.
 
 ## Services
 
@@ -51,14 +67,14 @@ PYTHONPATH=backend .venv/bin/python backend/market-data-service/scripts/seed_ins
 | auth-service | 8001 | 8 | Register, login, Google OAuth, JWT refresh rotation, bcrypt |
 | market-data-service | 8002 | 8 | Instruments, OHLCV history, financials, earnings, insider |
 | news-service | 8003 | 4 | RSS aggregation, FinBERT sentiment, Redis pub/sub |
-| forecast-service | 8004 | 8 | Real TFT inference (~8s), top picks, signals, batch |
+| forecast-service | 8004 | 8 | Real TFT inference (~5-6s), top picks, signals, batch |
 | portfolio-service | 8005 | 15 | Portfolios, positions (weighted avg), watchlists, CSV export |
 | notification-service | 8006 | 4 | WebSocket (Socket.IO), price alerts, email notifications |
 | edgar-service | 8007 | 4 | SEC EDGAR XBRL parsing, income/balance/cashflow |
 
 ## Tech Stack
 
-- **Backend:** Python 3.11, FastAPI, SQLAlchemy 2.0 async, asyncpg
+- **Backend:** Python 3.12, FastAPI 0.115, SQLAlchemy 2.0 async, asyncpg
 - **ML:** PyTorch, pytorch-forecasting (TFT), FinBERT, scikit-learn (PCA)
 - **Database:** PostgreSQL 15 (9 schemas, 33 tables)
 - **Cache:** Redis 7 (rate limiting, pub/sub, price cache)
@@ -95,7 +111,7 @@ pytest tests/test_unit.py -v
 # Integration tests (requires Docker services running)
 pytest tests/ -v --ignore=tests/test_unit.py
 
-# Full suite: 174 tests (22 unit + 152 integration)
+# Full suite: 163 tests (22 unit + 141 integration)
 ```
 
 ## Data Pipeline
@@ -105,11 +121,12 @@ pytest tests/ -v --ignore=tests/test_unit.py
 python backend/market-data-service/scripts/seed_instruments.py
 
 # Update scripts (run via cron or Airflow)
-python backend/market-data-service/scripts/update_prices.py
+python backend/market-data-service/scripts/update_prices.py    # OHLCV (every 15 min)
+python backend/market-data-service/scripts/update_macro.py     # VIX, S&P500, DXY, gold, oil
 python backend/market-data-service/scripts/update_financials.py
 python backend/market-data-service/scripts/update_earnings.py
 python backend/market-data-service/scripts/update_insider.py
-python backend/news-service/scripts/fetch_news.py
+python backend/news-service/scripts/fetch_news.py              # RSS + FinBERT sentiment
 python backend/edgar-service/scripts/fetch_edgar.py
 python backend/forecast-service/scripts/run_batch_forecast.py
 ```
@@ -120,6 +137,12 @@ python backend/forecast-service/scripts/run_batch_forecast.py
 - **Input:** 107 features (OHLCV, technicals, macro, FinBERT sentiment, SEC financials)
 - **Output:** 7 quantiles × 22 trading days (1 month forecast)
 - **Metrics:** MAPE 6.1%, Win Rate 99.5% (confident signals), Top-20 Return 77.7%
+
+## Documentation
+
+- **`CLAUDE.md`** — Project context, architecture, ML model details, design system
+- **`PLAN.md`** — Full product spec, screens, DB schemas, roadmap
+- **`docs/BACKEND_API.md`** — Complete API reference for frontend (66 endpoints, all schemas, WebSocket events)
 
 ## License
 

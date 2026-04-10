@@ -18,6 +18,7 @@ class ForecastFactor(BaseModel):
     name: str
     weight: float
     direction: str  # bullish | bearish | neutral
+    is_estimated: bool = False
 
 
 class ForecastResponse(BaseModel):
@@ -30,6 +31,11 @@ class ForecastResponse(BaseModel):
     variable_importance: dict[str, list[ForecastFactor]]
     inference_time_s: float
     forecast_date: str
+    predicted_return_1d: float | None = None
+    predicted_return_1w: float | None = None
+    predicted_return_1m: float | None = None
+    news_articles_used: int | None = None
+    persisted: bool | None = None
 
 
 class ForecastFromDB(BaseModel):

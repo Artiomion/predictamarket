@@ -24,7 +24,7 @@ async def _get_portfolio_owned(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID,
 ) -> Portfolio:
-# Single query checks both existence AND ownership — no IDOR enumeration
+    # Single query checks both existence AND ownership — no IDOR enumeration
     result = await session.execute(
         select(Portfolio).where(
             Portfolio.id == portfolio_id,
@@ -118,7 +118,7 @@ async def add_position(
     pos_limit = POSITION_LIMITS.get(tier, 10)
     pos_count = await session.execute(
         select(func.count()).select_from(PortfolioItem).where(
-            # PortfolioItem.portfolio_id == portfolio_id
+            PortfolioItem.portfolio_id == portfolio_id
         )
     )
     if (pos_count.scalar() or 0) >= pos_limit:
@@ -198,7 +198,7 @@ async def delete_position(
     if not item:
         raise HTTPException(status_code=404, detail=f"Position {ticker_upper} not found")
 
-# Clamp sell_qty to actual held quantity
+    # Clamp sell_qty to actual held quantity
     sell_qty = min(quantity or item.quantity, item.quantity)
     sell_price = price or item.avg_buy_price
 
@@ -207,11 +207,9 @@ async def delete_position(
     else:
         item.quantity -= sell_qty
 
-    inst = await session.execute(select(Instrument.id).where(Instrument.ticker == ticker_upper))
-    instrument_id = inst.scalar_one()
     tx = Transaction(
         portfolio_id=portfolio_id,
-        instrument_id=instrument_id,
+        instrument_id=item.instrument_id,
         ticker=ticker_upper,
         type="sell",
         quantity=sell_qty,
