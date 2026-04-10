@@ -5,6 +5,11 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { mockLandingStats } from "@/lib/mock-data"
+import { LiveDemo } from "@/components/landing/LiveDemo"
+import { Features } from "@/components/landing/Features"
+import { Performance } from "@/components/landing/Performance"
+import { Pricing } from "@/components/landing/Pricing"
+import { Footer } from "@/components/landing/Footer"
 
 const stats = [
   { value: `${mockLandingStats.model_accuracy}%`, label: "Win Rate" },
@@ -18,7 +23,6 @@ export default function LandingPage() {
     <>
       {/* Hero */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
-        {/* Background grid pattern */}
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.03]"
           style={{
@@ -27,12 +31,9 @@ export default function LandingPage() {
             backgroundSize: "60px 60px",
           }}
         />
-
-        {/* Radial gradient glow */}
         <div className="pointer-events-none absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[800px] rounded-full bg-[radial-gradient(ellipse,rgba(0,212,170,0.08)_0%,transparent_70%)]" />
 
         <div className="relative z-10 mx-auto max-w-4xl text-center">
-          {/* Floating badges */}
           <div className="mb-8 flex items-center justify-center gap-3">
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}
@@ -52,7 +53,6 @@ export default function LandingPage() {
             </motion.span>
           </div>
 
-          {/* Heading */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -66,7 +66,6 @@ export default function LandingPage() {
             Stock Predictions
           </motion.h1>
 
-          {/* Subtitle */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -76,7 +75,6 @@ export default function LandingPage() {
             107 data signals. 94 S&P 500 stocks. One prediction engine.
           </motion.p>
 
-          {/* CTA */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -91,7 +89,6 @@ export default function LandingPage() {
             </Link>
           </motion.div>
 
-          {/* Stats row */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -113,6 +110,12 @@ export default function LandingPage() {
           </motion.div>
         </div>
       </section>
+
+      <LiveDemo />
+      <Features />
+      <Performance />
+      <Pricing />
+      <Footer />
     </>
   )
 }
