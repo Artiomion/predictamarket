@@ -96,6 +96,17 @@ async def subscribe_user(sid: str, data: dict) -> None:
     await logger.ainfo("ws_subscribe_user", sid=sid, user_id=requested_user_id)
 
 
+def get_subscribed_tickers() -> set[str]:
+    """Return tickers that have at least 1 WebSocket subscriber in their room."""
+    tickers: set[str] = set()
+    rooms = sio.manager.rooms.get("/", {})
+    for room_name in rooms:
+        if isinstance(room_name, str) and room_name.startswith("ticker:"):
+            if rooms[room_name]:  # has participants
+                tickers.add(room_name[7:])  # strip "ticker:" prefix
+    return tickers
+
+
 async def emit_price_update(ticker: str, price_data: dict) -> None:
     await sio.emit("price:update", price_data, room=f"ticker:{ticker}")
 

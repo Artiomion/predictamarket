@@ -18,6 +18,7 @@ from services.websocket import (
     emit_forecast_ready,
     emit_news_high_impact,
     emit_price_update,
+    get_subscribed_tickers,
 )
 
 logger = structlog.get_logger()
@@ -113,7 +114,8 @@ async def _price_poller() -> None:
                     price = data.get("price", 0)
                     if not price:
                         continue
-                    await emit_price_update(ticker, data)
+                    # Price updates are now delivered via Pub/Sub (_redis_subscriber).
+                    # Only collect prices here for alert checking — no duplicate emit.
                     ticker_prices.append((ticker, price, data))
 
                 # Single session for all alert checks
@@ -155,11 +157,115 @@ async def _price_poller() -> None:
         await price_client.aclose()
 
 
+# ── Live price fetcher — yfinance for subscribed tickers ─────────────────────
+
+_LIVE_POLL_INTERVAL = 30  # seconds
+_CIRCUIT_BREAKER_THRESHOLD = 3
+_CIRCUIT_BREAKER_COOLDOWN = 300  # 5 minutes
+
+
+async def _live_price_fetcher() -> None:
+    """Fetch live prices from yfinance for tickers with WebSocket subscribers.
+
+    Only polls tickers that have at least 1 client in the Socket.IO room.
+    Circuit breaker: 3 consecutive failures → 5 min pause.
+    """
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    consecutive_failures = 0
+
+    try:
+        while _running:
+            try:
+                tickers = get_subscribed_tickers()
+                if not tickers:
+                    await asyncio.sleep(_LIVE_POLL_INTERVAL)
+                    continue
+
+                if consecutive_failures >= _CIRCUIT_BREAKER_THRESHOLD:
+                    await logger.awarning(
+                        "live_price_circuit_open",
+                        failures=consecutive_failures,
+                        cooldown=_CIRCUIT_BREAKER_COOLDOWN,
+                    )
+                    await asyncio.sleep(_CIRCUIT_BREAKER_COOLDOWN)
+                    consecutive_failures = 0
+
+                # Fetch all subscribed tickers in one yfinance call
+                import yfinance as yf
+                ticker_str = " ".join(sorted(tickers))
+                try:
+                    data = yf.download(
+                        ticker_str,
+                        period="2d",
+                        interval="1d",
+                        progress=False,
+                        timeout=10,
+                        group_by="ticker" if len(tickers) > 1 else "column",
+                    )
+                except Exception as exc:
+                    consecutive_failures += 1
+                    await logger.awarning("live_price_yf_error", error=str(exc), failures=consecutive_failures)
+                    await asyncio.sleep(_LIVE_POLL_INTERVAL)
+                    continue
+
+                if data is None or data.empty:
+                    consecutive_failures += 1
+                    await asyncio.sleep(_LIVE_POLL_INTERVAL)
+                    continue
+
+                consecutive_failures = 0  # reset on success
+
+                for ticker in tickers:
+                    try:
+                        if len(tickers) == 1:
+                            df = data
+                        else:
+                            df = data[ticker] if ticker in data.columns.get_level_values(0) else None
+                        if df is None or df.empty or len(df) < 1:
+                            continue
+
+                        latest_close = float(df["Close"].iloc[-1])
+                        if latest_close != latest_close:  # NaN check
+                            continue
+                        prev_close = float(df["Close"].iloc[-2]) if len(df) >= 2 else None
+
+                        price_data = {
+                            "ticker": ticker,
+                            "price": round(latest_close, 2),
+                            "change": round(latest_close - prev_close, 2) if prev_close else None,
+                            "change_pct": round((latest_close - prev_close) / prev_close * 100, 2) if prev_close else None,
+                        }
+                        price_json = json.dumps(price_data)
+
+                        # Only publish if price changed
+                        old = await redis_client.get(f"mkt:price:{ticker}")
+                        await redis_client.set(f"mkt:price:{ticker}", price_json, ex=900)
+                        if old != price_json:
+                            await redis_client.publish("price.updated", price_json)
+
+                    except Exception as exc:
+                        await logger.awarning("live_price_ticker_error", ticker=ticker, error=str(exc))
+
+                await logger.ainfo("live_price_fetched", tickers=sorted(tickers), count=len(tickers))
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await logger.aerror("live_price_error", error=str(exc))
+
+            await asyncio.sleep(_LIVE_POLL_INTERVAL)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await redis_client.aclose()
+
+
 async def start_background_tasks() -> None:
     global _running
     _running = True
     _tasks.append(asyncio.create_task(_redis_subscriber()))
     _tasks.append(asyncio.create_task(_price_poller()))
+    _tasks.append(asyncio.create_task(_live_price_fetcher()))
     await logger.ainfo("background_tasks_started")
 
 
