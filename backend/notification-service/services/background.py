@@ -48,30 +48,35 @@ async def _redis_subscriber() -> None:
 
     try:
         while _running:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            if message and message["type"] == "message":
-                channel = message["channel"]
-                try:
-                    data = json.loads(message["data"])
-                except (json.JSONDecodeError, TypeError):
-                    continue
+            try:
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message and message["type"] == "message":
+                    channel = message["channel"]
+                    try:
+                        data = json.loads(message["data"])
+                    except (json.JSONDecodeError, TypeError):
+                        continue
 
-                if channel == "price.updated":
-                    ticker = data.get("ticker", "")
-                    if ticker:
-                        await emit_price_update(ticker, data)
-                        await logger.ainfo("pubsub_price", ticker=ticker, price=data.get("price"))
+                    if channel == "price.updated":
+                        ticker = data.get("ticker", "")
+                        if ticker:
+                            await emit_price_update(ticker, data)
 
-                elif channel == "news.high_impact":
-                    tickers = data.get("tickers", [])
-                    await emit_news_high_impact(tickers, data)
-                    await logger.ainfo("pubsub_news", tickers=tickers)
+                    elif channel == "news.high_impact":
+                        tickers = data.get("tickers", [])
+                        await emit_news_high_impact(tickers, data)
+                        await logger.ainfo("pubsub_news", tickers=tickers)
 
-                elif channel == "forecast.updated":
-                    ticker = data.get("ticker", "")
-                    if ticker:
-                        await emit_forecast_ready(ticker, data)
-                    await logger.ainfo("pubsub_forecast", data=data)
+                    elif channel == "forecast.updated":
+                        ticker = data.get("ticker", "")
+                        if ticker:
+                            await emit_forecast_ready(ticker, data)
+                        await logger.ainfo("pubsub_forecast", data=data)
+
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                await logger.aerror("pubsub_error", error=str(exc))
 
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:

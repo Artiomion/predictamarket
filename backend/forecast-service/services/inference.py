@@ -103,15 +103,17 @@ def _backfill_fresh_prices(ticker: str) -> None:
                     import json as _json
                     import redis as _redis
                     _r = _redis.Redis.from_url(settings.REDIS_URL)
-                    price_data = {
-                        "ticker": ticker,
-                        "price": latest_close,
-                        "change": round(latest_close - prev_close, 2) if prev_close else None,
-                        "change_pct": round((latest_close - prev_close) / prev_close * 100, 2) if prev_close else None,
-                    }
-                    _r.set(f"mkt:price:{ticker}", _json.dumps(price_data), ex=900)
-                    _r.publish("price.updated", _json.dumps(price_data))
-                    _r.close()
+                    try:
+                        price_data = {
+                            "ticker": ticker,
+                            "price": latest_close,
+                            "change": round(latest_close - prev_close, 2) if prev_close else None,
+                            "change_pct": round((latest_close - prev_close) / prev_close * 100, 2) if prev_close else None,
+                        }
+                        _r.set(f"mkt:price:{ticker}", _json.dumps(price_data), ex=900)
+                        _r.publish("price.updated", _json.dumps(price_data))
+                    finally:
+                        _r.close()
 
             structlog.get_logger().info("prices_backfilled", ticker=ticker, rows=len(hist))
         finally:
