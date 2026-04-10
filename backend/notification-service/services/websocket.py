@@ -97,13 +97,19 @@ async def subscribe_user(sid: str, data: dict) -> None:
 
 
 def get_subscribed_tickers() -> set[str]:
-    """Return tickers that have at least 1 WebSocket subscriber in their room."""
+    """Return tickers that have at least 1 WebSocket subscriber in their room.
+
+    Takes a snapshot of the rooms dict to avoid race conditions with
+    Socket.IO event handlers modifying rooms concurrently.
+    """
     tickers: set[str] = set()
-    rooms = sio.manager.rooms.get("/", {})
-    for room_name in rooms:
-        if isinstance(room_name, str) and room_name.startswith("ticker:"):
-            if rooms[room_name]:  # has participants
-                tickers.add(room_name[7:])  # strip "ticker:" prefix
+    try:
+        rooms = dict(sio.manager.rooms.get("/", {}))  # snapshot copy
+    except RuntimeError:
+        return tickers  # dict changed during copy — return empty, retry next cycle
+    for room_name, participants in rooms.items():
+        if isinstance(room_name, str) and room_name.startswith("ticker:") and participants:
+            tickers.add(room_name[7:])
     return tickers
 
 

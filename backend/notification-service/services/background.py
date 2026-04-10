@@ -190,17 +190,19 @@ async def _live_price_fetcher() -> None:
                     await asyncio.sleep(_CIRCUIT_BREAKER_COOLDOWN)
                     consecutive_failures = 0
 
-                # Fetch all subscribed tickers in one yfinance call
+                # Fetch all subscribed tickers in one yfinance call (sync → to_thread)
                 import yfinance as yf
                 ticker_str = " ".join(sorted(tickers))
+                multi = len(tickers) > 1
                 try:
-                    data = yf.download(
+                    data = await asyncio.to_thread(
+                        yf.download,
                         ticker_str,
                         period="2d",
                         interval="1d",
                         progress=False,
                         timeout=10,
-                        group_by="ticker" if len(tickers) > 1 else "column",
+                        group_by="ticker" if multi else "column",
                     )
                 except Exception as exc:
                     consecutive_failures += 1
