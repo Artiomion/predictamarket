@@ -1,51 +1,72 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Briefcase, Plus, TrendingUp, TrendingDown } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PriceChange } from "@/components/ui/price-change"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { PortfolioDetail } from "@/components/features/PortfolioDetail"
-import { mockPortfolios, mockPositions } from "@/lib/mock-data"
+import { portfolioApi } from "@/lib/api"
 import type { Portfolio } from "@/types"
 
 export default function PortfolioPage() {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>(mockPortfolios)
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([])
+  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newName, setNewName] = useState("")
   const [newDesc, setNewDesc] = useState("")
-  const [expanded, setExpanded] = useState<string | null>(portfolios[0]?.id ?? null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  const handleCreate = () => {
+  useEffect(() => {
+    portfolioApi.getPortfolios()
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : []
+        setPortfolios(list)
+        if (list.length > 0) setExpanded(list[0].id)
+      })
+      .catch(() => setPortfolios([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleCreate = async () => {
     if (!newName.trim()) return
-    const p: Portfolio = {
-      id: crypto.randomUUID(),
-      name: newName.trim(),
-      description: newDesc.trim(),
-      is_default: portfolios.length === 0,
-      total_value: 0,
-      total_pnl: 0,
-      total_pnl_pct: 0,
-      created_at: new Date().toISOString(),
+    try {
+      const { data } = await portfolioApi.createPortfolio({ name: newName.trim(), description: newDesc.trim() || undefined })
+      setPortfolios([...portfolios, data])
+      setExpanded(data.id)
+      setNewName("")
+      setNewDesc("")
+      setDialogOpen(false)
+      toast.success(`Portfolio "${data.name}" created`)
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number } }
+      if (error.response?.status === 403) {
+        toast.error("Upgrade to Pro to create more portfolios")
+      }
     }
-    setPortfolios([...portfolios, p])
-    setNewName("")
-    setNewDesc("")
-    setDialogOpen(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-8 w-36" />
+        </div>
+        <Skeleton className="h-24 rounded-card" />
+        <Skeleton className="h-24 rounded-card" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-semibold">Portfolio</h1>
         {portfolios.length > 0 && (
@@ -56,7 +77,6 @@ export default function PortfolioPage() {
         )}
       </div>
 
-      {/* Empty state */}
       {portfolios.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -66,29 +86,21 @@ export default function PortfolioPage() {
         >
           <div className="max-w-sm text-center">
             <Briefcase className="mx-auto size-12 text-text-muted" />
-            <h2 className="mt-5 font-heading text-lg font-semibold">
-              Start tracking your investments
-            </h2>
+            <h2 className="mt-5 font-heading text-lg font-semibold">Start tracking your investments</h2>
             <p className="mt-2 text-sm text-text-secondary leading-relaxed">
               Create a portfolio to monitor performance, analyze sectors, and export reports.
             </p>
-            <Button
-              variant="gradient"
-              className="mt-6 gap-1.5"
-              onClick={() => setDialogOpen(true)}
-            >
-              <Plus className="size-4" />
-              Create Portfolio
+            <Button variant="gradient" className="mt-6 gap-1.5" onClick={() => setDialogOpen(true)}>
+              <Plus className="size-4" /> Create Portfolio
             </Button>
           </div>
         </motion.div>
       ) : (
-        /* Portfolio cards */
         <div className="space-y-4">
           <AnimatePresence>
             {portfolios.map((portfolio, i) => {
               const isExpanded = expanded === portfolio.id
-              const isPositive = portfolio.total_pnl >= 0
+              const isPositive = (portfolio.total_pnl ?? 0) >= 0
 
               return (
                 <motion.div
@@ -98,7 +110,6 @@ export default function PortfolioPage() {
                   transition={{ delay: i * 0.05, duration: 0.3, ease: "easeOut" }}
                   className="rounded-card border border-border-subtle bg-bg-surface transition-colors hover:border-border-hover"
                 >
-                  {/* Card header — clickable */}
                   <button
                     onClick={() => setExpanded(isExpanded ? null : portfolio.id)}
                     className="flex w-full items-center justify-between px-5 py-4 text-left"
@@ -114,28 +125,19 @@ export default function PortfolioPage() {
                         )}
                       </div>
                     </div>
-
                     <div className="flex items-center gap-6">
                       <div className="text-right">
                         <p className="font-mono text-base font-medium tabular-nums">
-                          ${portfolio.total_value.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          ${(portfolio.total_value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </p>
                         <div className="mt-0.5 flex items-center justify-end gap-1.5">
-                          {isPositive ? (
-                            <TrendingUp className="size-3 text-success" />
-                          ) : (
-                            <TrendingDown className="size-3 text-danger" />
-                          )}
+                          {isPositive ? <TrendingUp className="size-3 text-success" /> : <TrendingDown className="size-3 text-danger" />}
                           <PriceChange value={portfolio.total_pnl_pct} className="text-xs" />
-                          <span className="font-mono text-xs tabular-nums text-text-muted">
-                            (${Math.abs(portfolio.total_pnl).toLocaleString("en-US", { minimumFractionDigits: 2 })})
-                          </span>
                         </div>
                       </div>
                     </div>
                   </button>
 
-                  {/* Expanded positions */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -146,7 +148,7 @@ export default function PortfolioPage() {
                         className="overflow-hidden border-t border-border-subtle"
                       >
                         <div className="px-5 py-4">
-                          <PortfolioDetail initialPositions={mockPositions} />
+                          <PortfolioDetail portfolioId={portfolio.id} />
                         </div>
                       </motion.div>
                     )}
@@ -158,46 +160,25 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* Create Portfolio Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Portfolio</DialogTitle>
-            <DialogDescription>
-              Track your stock positions and monitor performance.
-            </DialogDescription>
+            <DialogDescription>Track your stock positions and monitor performance.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label htmlFor="portfolio-name" className="mb-1.5 block text-sm text-text-secondary">
-                Name
-              </label>
-              <Input
-                id="portfolio-name"
-                placeholder="e.g. Tech Growth"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
+              <label htmlFor="portfolio-name" className="mb-1.5 block text-sm text-text-secondary">Name</label>
+              <Input id="portfolio-name" placeholder="e.g. Tech Growth" value={newName} onChange={(e) => setNewName(e.target.value)} />
             </div>
             <div>
-              <label htmlFor="portfolio-desc" className="mb-1.5 block text-sm text-text-secondary">
-                Description
-              </label>
-              <Input
-                id="portfolio-desc"
-                placeholder="Optional description"
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-              />
+              <label htmlFor="portfolio-desc" className="mb-1.5 block text-sm text-text-secondary">Description</label>
+              <Input id="portfolio-desc" placeholder="Optional description" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="gradient" onClick={handleCreate} disabled={!newName.trim()}>
-              Create
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="gradient" onClick={handleCreate} disabled={!newName.trim()}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

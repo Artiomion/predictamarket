@@ -2,8 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY portfolio-service/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-base.txt ./requirements-base.txt
+COPY portfolio-service/requirements.txt ./requirements-service.txt
+RUN pip install --no-cache-dir -r requirements-base.txt && grep -v "requirements-base" requirements-service.txt | pip install --no-cache-dir -r /dev/stdin
 
 COPY shared/ /app/shared/
 COPY portfolio-service/ /app/

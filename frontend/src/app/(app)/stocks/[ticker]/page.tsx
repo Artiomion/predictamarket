@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { Star, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
+import { RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { WatchlistButton } from "@/components/features/WatchlistButton"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PriceChange } from "@/components/ui/price-change"
 import { StockChart } from "@/components/charts/StockChart"
@@ -34,7 +34,6 @@ export default function StockPage() {
   const params = useParams()
   const ticker = (params.ticker as string)?.toUpperCase()
   const [activeTab, setActiveTab] = useState<TabId>("chart")
-  const [watchlisted, setWatchlisted] = useState(false)
 
   const [instrument, setInstrument] = useState<Instrument | null>(null)
   const [price, setPrice] = useState<TickerPrice | null>(null)
@@ -61,11 +60,6 @@ export default function StockPage() {
     }
     load()
   }, [ticker])
-
-  const toggleWatchlist = () => {
-    setWatchlisted(!watchlisted)
-    toast(watchlisted ? `${ticker} removed from watchlist` : `${ticker} added to watchlist`, { duration: 2000 })
-  }
 
   if (loading) {
     return (
@@ -131,14 +125,7 @@ export default function StockPage() {
               <PriceChange value={price.change_pct} className="justify-end" />
             </div>
           )}
-          <Button
-            variant={watchlisted ? "default" : "outline"}
-            size="icon"
-            onClick={toggleWatchlist}
-            className={cn(watchlisted && "text-warning bg-warning/10 border-warning/20")}
-          >
-            <Star className={cn("size-4", watchlisted && "fill-current")} />
-          </Button>
+          <WatchlistButton ticker={ticker} />
         </div>
       </div>
 
