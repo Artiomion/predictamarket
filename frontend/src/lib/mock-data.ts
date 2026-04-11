@@ -244,11 +244,9 @@ export const mockAlerts: Alert[] = [
 
 // ── Insider Transactions ─────────────────────────────
 export const mockInsiderTransactions: InsiderTransaction[] = [
-  { insider_name: 'Tim Cook', title: 'CEO', transaction_type: 'sell' as const, shares: 75000, price: 258.50, total_value: 19387500, date: '2026-04-08', ticker: 'AAPL' },
-  { insider_name: 'Luca Maestri', title: 'CFO', transaction_type: 'sell' as const, shares: 30000, price: 255.20, total_value: 7656000, date: '2026-03-28', ticker: 'AAPL' },
-  { insider_name: 'Jeff Williams', title: 'COO', transaction_type: 'buy' as const, shares: 10000, price: 248.00, total_value: 2480000, date: '2026-03-20', ticker: 'AAPL' },
-  { insider_name: 'Deirdre O\'Brien', title: 'SVP Retail', transaction_type: 'sell' as const, shares: 15000, price: 252.80, total_value: 3792000, date: '2026-03-15', ticker: 'AAPL' },
-  { insider_name: 'Craig Federighi', title: 'SVP Engineering', transaction_type: 'buy' as const, shares: 5000, price: 250.00, total_value: 1250000, date: '2026-03-10', ticker: 'AAPL' },
+  { insider_name: 'Tim Cook', insider_title: 'CEO', transaction_type: 'sell', shares: 75000, price_per_share: 258.50, total_value: 19387500, shares_owned_after: null, filing_date: '2026-04-08', transaction_date: '2026-04-08' },
+  { insider_name: 'Luca Maestri', insider_title: 'CFO', transaction_type: 'sell', shares: 30000, price_per_share: 255.20, total_value: 7656000, shares_owned_after: null, filing_date: '2026-03-28', transaction_date: '2026-03-28' },
+  { insider_name: 'Jeff Williams', insider_title: 'COO', transaction_type: 'buy', shares: 10000, price_per_share: 248.00, total_value: 2480000, shares_owned_after: null, filing_date: '2026-03-20', transaction_date: '2026-03-20' },
 ];
 
 // ── Landing Page Stats ────────────────────────────────

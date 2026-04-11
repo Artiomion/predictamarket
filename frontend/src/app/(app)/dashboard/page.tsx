@@ -8,13 +8,14 @@ import { useAuthStore } from "@/store/auth-store"
 import { TopPicks } from "@/components/features/TopPicks"
 import { LatestSignals } from "@/components/features/LatestSignals"
 import { MarketNews } from "@/components/features/MarketNews"
+import { marketApi } from "@/lib/api"
 
-const marketOverview = [
-  { label: "S&P 500", value: 5842.01, change: 1.23 },
-  { label: "VIX", value: 17.82, change: -3.45 },
-  { label: "Gold", value: 2385.60, change: 0.67 },
-  { label: "Oil (WTI)", value: 78.42, change: -1.12 },
-] as const
+const MARKET_TICKERS = [
+  { ticker: "AAPL", label: "S&P 500" },
+  { ticker: "MSFT", label: "Tech" },
+  { ticker: "JPM", label: "Financials" },
+  { ticker: "CVX", label: "Energy" },
+]
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -23,7 +24,13 @@ function getGreeting(): string {
   return "Good evening"
 }
 
-function MarketCard({ label, value, change }: { label: string; value: number; change: number }) {
+interface MarketItem {
+  label: string
+  value: number
+  change: number
+}
+
+function MarketCard({ label, value, change }: MarketItem) {
   return (
     <div className="flex items-center justify-between rounded-card border border-border-subtle bg-bg-surface px-4 py-3">
       <div>
@@ -49,15 +56,33 @@ function MarketCardSkeleton() {
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user)
   const [loading, setLoading] = useState(true)
+  const [marketData, setMarketData] = useState<MarketItem[]>([])
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500)
-    return () => clearTimeout(timer)
+    const loadPrices = async () => {
+      try {
+        const results = await Promise.all(
+          MARKET_TICKERS.map(async ({ ticker, label }) => {
+            try {
+              const { data } = await marketApi.getPrice(ticker)
+              return { label, value: data.price, change: data.change_pct }
+            } catch {
+              return null
+            }
+          })
+        )
+        setMarketData(results.filter((r): r is MarketItem => r !== null))
+      } catch {
+        // Fallback to empty
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadPrices()
   }, [])
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
         <p className="mt-1 text-sm text-text-secondary">
@@ -65,7 +90,6 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Market Overview */}
       <section>
         <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">
           Market Overview
@@ -75,7 +99,7 @@ export default function DashboardPage() {
             ? Array.from({ length: 4 }).map((_, i) => (
                 <MarketCardSkeleton key={i} />
               ))
-            : marketOverview.map((item, i) => (
+            : marketData.map((item, i) => (
                 <motion.div
                   key={item.label}
                   initial={{ opacity: 0, y: 8 }}
@@ -88,13 +112,11 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Top Picks + Signals */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
         <TopPicks />
         <LatestSignals />
       </div>
 
-      {/* News */}
       <MarketNews />
     </div>
   )

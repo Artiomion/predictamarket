@@ -243,13 +243,14 @@ export interface Notification {
 
 export interface InsiderTransaction {
   insider_name: string;
-  title: string;
+  insider_title: string;
   transaction_type: 'buy' | 'sell';
   shares: number;
-  price: number;
+  price_per_share: number;
   total_value: number;
-  date: string;
-  ticker: string;
+  shares_owned_after: number | null;
+  filing_date: string;
+  transaction_date: string;
 }
 
 // ── Landing ───────────────────────────────────────────

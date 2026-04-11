@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, type ISeriesApi, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from "lightweight-charts"
 import { cn } from "@/lib/utils"
 import { colors } from "@/lib/design-tokens"
-import { mockPriceHistory } from "@/lib/mock-data"
+import { marketApi } from "@/lib/api"
+import type { PriceBar } from "@/types"
 
 const timeframes = [
-  { id: "1D", label: "1D", count: 1 },
-  { id: "1W", label: "1W", count: 5 },
-  { id: "1M", label: "1M", count: 22 },
-  { id: "3M", label: "3M", count: 999 },
+  { id: "1m", label: "1M", period: "1m" },
+  { id: "3m", label: "3M", period: "3m" },
+  { id: "6m", label: "6M", period: "6m" },
+  { id: "1y", label: "1Y", period: "1y" },
+  { id: "5y", label: "5Y", period: "5y" },
 ] as const
 
 type TimeframeId = (typeof timeframes)[number]["id"]
@@ -24,14 +26,21 @@ interface TooltipData {
   volume: number
 }
 
-export function StockChart() {
+interface StockChartProps {
+  ticker?: string
+}
+
+export function StockChart({ ticker = "AAPL" }: StockChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null)
-  const [activeTimeframe, setActiveTimeframe] = useState<TimeframeId>("3M")
+  const [activeTimeframe, setActiveTimeframe] = useState<TimeframeId>("3m")
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [history, setHistory] = useState<PriceBar[]>([])
 
+  // Create chart once
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -83,7 +92,6 @@ export function StockChart() {
     candleRef.current = candleSeries
     volumeRef.current = volumeSeries
 
-    // Crosshair tooltip
     chart.subscribeCrosshairMove((param) => {
       if (!param.time || !param.seriesData.size) {
         setTooltip(null)
@@ -91,26 +99,24 @@ export function StockChart() {
       }
       const candle = param.seriesData.get(candleSeries)
       if (candle && "open" in candle) {
-        const bar = mockPriceHistory.find((b) => b.date === param.time)
         setTooltip({
           date: param.time as string,
           open: candle.open,
           high: candle.high,
           low: candle.low,
           close: candle.close,
-          volume: bar?.volume ?? 0,
+          volume: 0,
         })
       }
     })
 
-    // Resize observer
+    const container = containerRef.current
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width } = entry.contentRect
         chart.resize(width, width < 640 ? 300 : 400)
       }
     })
-    const container = containerRef.current
     observer.observe(container)
 
     return () => {
@@ -119,37 +125,37 @@ export function StockChart() {
     }
   }, [])
 
-  // Update data on timeframe change
+  // Fetch data on ticker/timeframe change
   useEffect(() => {
-    if (!candleRef.current || !volumeRef.current) return
-
+    if (!ticker) return
     const tf = timeframes.find((t) => t.id === activeTimeframe)
-    const data = mockPriceHistory.slice(-(tf?.count ?? 999))
+    setLoading(true)
 
-    candleRef.current.setData(
-      data.map((d) => ({
-        time: d.date,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }))
-    )
-
-    volumeRef.current.setData(
-      data.map((d) => ({
-        time: d.date,
-        value: d.volume,
-        color: d.close >= d.open ? "rgba(0,255,136,0.3)" : "rgba(255,51,102,0.3)",
-      }))
-    )
-
-    chartRef.current?.timeScale().fitContent()
-  }, [activeTimeframe])
+    marketApi.getHistory(ticker, { period: tf?.period || "3m" })
+      .then(({ data }) => {
+        setHistory(data)
+        if (candleRef.current && volumeRef.current && data.length > 0) {
+          candleRef.current.setData(
+            data.map((d) => ({ time: d.date, open: d.open, high: d.high, low: d.low, close: d.close }))
+          )
+          volumeRef.current.setData(
+            data.map((d) => ({
+              time: d.date,
+              value: d.volume,
+              color: d.close >= d.open ? "rgba(0,255,136,0.3)" : "rgba(255,51,102,0.3)",
+            }))
+          )
+          chartRef.current?.timeScale().fitContent()
+        }
+      })
+      .catch(() => {
+        // Keep existing data if fetch fails
+      })
+      .finally(() => setLoading(false))
+  }, [ticker, activeTimeframe])
 
   return (
     <div className="space-y-3">
-      {/* Timeframe buttons */}
       <div className="flex items-center gap-1">
         {timeframes.map((tf) => (
           <button
@@ -165,11 +171,10 @@ export function StockChart() {
             {tf.label}
           </button>
         ))}
+        {loading && <span className="ml-2 text-xs text-text-muted">Loading...</span>}
       </div>
 
-      {/* Chart container */}
       <div className="relative rounded-card border border-border-subtle overflow-hidden">
-        {/* Tooltip overlay */}
         {tooltip && (
           <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-button border border-border-subtle bg-bg-surface/90 px-3 py-2 backdrop-blur-sm">
             <p className="text-xs text-text-muted">{tooltip.date}</p>
@@ -182,14 +187,16 @@ export function StockChart() {
               <span className="font-mono tabular-nums text-text-primary">{tooltip.low.toFixed(2)}</span>
               <span className="text-text-muted">C</span>
               <span className="font-mono tabular-nums text-text-primary">{tooltip.close.toFixed(2)}</span>
-              <span className="text-text-muted">Vol</span>
-              <span className="font-mono tabular-nums text-text-primary">
-                {(tooltip.volume / 1_000_000).toFixed(1)}M
-              </span>
             </div>
           </div>
         )}
-        <div ref={containerRef} className="h-[400px] w-full max-sm:h-[300px]" />
+        {history.length === 0 && !loading ? (
+          <div className="flex h-[400px] items-center justify-center">
+            <p className="text-sm text-text-muted">No price history available</p>
+          </div>
+        ) : (
+          <div ref={containerRef} className="h-[400px] w-full max-sm:h-[300px]" />
+        )}
       </div>
     </div>
   )

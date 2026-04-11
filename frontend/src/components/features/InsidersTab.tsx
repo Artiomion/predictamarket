@@ -1,15 +1,39 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { formatValue } from "@/lib/formatters"
-import { mockInsiderTransactions } from "@/lib/mock-data"
+import { marketApi } from "@/lib/api"
+import type { InsiderTransaction } from "@/types"
 
 export function InsidersTab({ ticker }: { ticker: string }) {
-  const transactions = mockInsiderTransactions
-    .filter((t) => t.ticker === ticker)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const [transactions, setTransactions] = useState<InsiderTransaction[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    marketApi.getInsider(ticker, { limit: 50 })
+      .then(({ data }) => {
+        setTransactions(
+          [...data].sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
+        )
+      })
+      .catch(() => setTransactions([]))
+      .finally(() => setLoading(false))
+  }, [ticker])
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 rounded-card" />
+        ))}
+      </div>
+    )
+  }
 
   if (transactions.length === 0) {
     return (
@@ -39,14 +63,14 @@ export function InsidersTab({ ticker }: { ticker: string }) {
         <tbody>
           {transactions.map((t, i) => (
             <motion.tr
-              key={`${t.insider_name}-${t.date}`}
+              key={`${t.insider_name}-${t.transaction_date}`}
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, duration: 0.3, ease: "easeOut" }}
               className="border-b border-border-subtle last:border-b-0"
             >
               <td className="px-4 py-3 font-medium">{t.insider_name}</td>
-              <td className="hidden px-4 py-3 text-text-secondary sm:table-cell">{t.title}</td>
+              <td className="hidden px-4 py-3 text-text-secondary sm:table-cell">{t.insider_title}</td>
               <td className="px-4 py-3">
                 <Badge variant={t.transaction_type === "buy" ? "success" : "danger"} className="text-[10px]">
                   {t.transaction_type.toUpperCase()}
@@ -56,13 +80,13 @@ export function InsidersTab({ ticker }: { ticker: string }) {
                 {t.shares.toLocaleString("en-US")}
               </td>
               <td className="hidden px-4 py-3 text-right font-mono text-xs tabular-nums text-text-secondary md:table-cell">
-                ${t.price.toFixed(2)}
+                ${t.price_per_share?.toFixed(2) ?? "—"}
               </td>
               <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">
                 {formatValue(t.total_value)}
               </td>
               <td className="px-4 py-3 text-right text-xs text-text-muted">
-                {new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {new Date(t.transaction_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </td>
             </motion.tr>
           ))}
