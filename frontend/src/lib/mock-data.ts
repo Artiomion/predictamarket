@@ -1,4 +1,4 @@
-import type { User, Instrument, Portfolio, Position, NewsArticle, Alert, TopPick } from '@/types';
+import type { User, Instrument, Forecast, Portfolio, Position, NewsArticle, Alert, TopPick } from '@/types';
 
 // ── Auth ──────────────────────────────────────────────
 export const mockUser: User = {
@@ -59,6 +59,71 @@ export const mockSignals = [
   { ticker: 'GE',   signal: 'BUY' as const,  confidence: 'MEDIUM' as const, predicted_return_1m: 4.52, current_close: 205.30 },
   { ticker: 'GOOGL',signal: 'HOLD' as const, confidence: 'LOW' as const,    predicted_return_1m: 0.85, current_close: 161.28 },
 ];
+
+// ── News ──────────────────────────────────────────────
+// ── Forecasts ─────────────────────────────────────────
+export const mockForecasts: Record<string, Forecast> = {
+  AAPL: {
+    ticker: 'AAPL',
+    current_close: 259.49,
+    signal: 'SELL',
+    confidence: 'MEDIUM',
+    forecast: {
+      '1d': { median: 246.5, lower_80: 235.2, upper_80: 258.1, lower_95: 225.0, upper_95: 268.0 },
+      '3d': { median: 245.2, lower_80: 232.0, upper_80: 259.0, lower_95: 220.0, upper_95: 270.0 },
+      '1w': { median: 244.3, lower_80: 228.0, upper_80: 261.0, lower_95: 215.0, upper_95: 275.0 },
+      '2w': { median: 243.0, lower_80: 224.0, upper_80: 263.0, lower_95: 210.0, upper_95: 280.0 },
+      '1m': { median: 242.0, lower_80: 220.0, upper_80: 265.0, lower_95: 200.0, upper_95: 285.0 },
+    },
+    full_curve: [246.5, 245.8, 245.2, 244.8, 244.3, 243.5, 243.8, 243.2, 242.8, 242.5, 242.3, 242.0, 241.8, 241.5, 241.2, 241.0, 241.5, 241.8, 242.0, 241.5, 241.2, 242.0],
+    variable_importance: {
+      top_factors: [
+        { name: 'Low', weight: 0.0623, direction: 'bearish', is_estimated: false },
+        { name: 'oil', weight: 0.0456, direction: 'bearish', is_estimated: false },
+        { name: 'eps_surprise_pct', weight: 0.0195, direction: 'bearish', is_estimated: false },
+        { name: 'dxy', weight: 0.0127, direction: 'bullish', is_estimated: false },
+        { name: 'vix', weight: 0.0098, direction: 'bearish', is_estimated: true },
+      ],
+    },
+    inference_time_s: 5.8,
+    forecast_date: '2026-04-10',
+    predicted_return_1d: -5.02,
+    predicted_return_1w: -6.04,
+    predicted_return_1m: -6.43,
+    news_articles_used: 3,
+    persisted: true,
+  },
+  MSFT: {
+    ticker: 'MSFT',
+    current_close: 371.14,
+    signal: 'BUY',
+    confidence: 'MEDIUM',
+    forecast: {
+      '1d': { median: 396.0, lower_80: 380.0, upper_80: 412.0, lower_95: 365.0, upper_95: 425.0 },
+      '3d': { median: 397.5, lower_80: 378.0, upper_80: 416.0, lower_95: 360.0, upper_95: 430.0 },
+      '1w': { median: 398.7, lower_80: 375.0, upper_80: 420.0, lower_95: 358.0, upper_95: 435.0 },
+      '2w': { median: 396.5, lower_80: 370.0, upper_80: 425.0, lower_95: 350.0, upper_95: 440.0 },
+      '1m': { median: 394.1, lower_80: 360.0, upper_80: 430.0, lower_95: 340.0, upper_95: 450.0 },
+    },
+    full_curve: [396.0, 397.2, 397.8, 398.1, 398.7, 397.5, 396.8, 396.2, 395.8, 395.5, 395.2, 394.8, 394.5, 394.2, 394.0, 394.3, 394.5, 394.2, 393.8, 393.5, 394.0, 394.1],
+    variable_importance: {
+      top_factors: [
+        { name: 'Volume', weight: 0.0812, direction: 'bullish', is_estimated: false },
+        { name: 'sp500', weight: 0.0534, direction: 'bullish', is_estimated: false },
+        { name: 'rsi_14', weight: 0.0321, direction: 'bullish', is_estimated: false },
+        { name: 'gold', weight: 0.0198, direction: 'bearish', is_estimated: false },
+        { name: 'cpi', weight: 0.0087, direction: 'bullish', is_estimated: true },
+      ],
+    },
+    inference_time_s: 0.77,
+    forecast_date: '2026-04-10',
+    predicted_return_1d: 6.72,
+    predicted_return_1w: 7.42,
+    predicted_return_1m: 6.18,
+    news_articles_used: 5,
+    persisted: true,
+  },
+};
 
 // ── News ──────────────────────────────────────────────
 export const mockNews: NewsArticle[] = [

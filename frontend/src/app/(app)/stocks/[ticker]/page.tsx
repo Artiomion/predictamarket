@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SignalBadge } from "@/components/ui/signal-badge"
 import { StockChart } from "@/components/charts/StockChart"
+import { ForecastTab } from "@/components/features/ForecastTab"
 import { PriceChange } from "@/components/ui/price-change"
 import { mockInstruments, mockPrices, mockSignals } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
@@ -149,6 +150,8 @@ export default function StockPage() {
         >
           {activeTab === "chart" ? (
             <StockChart />
+          ) : activeTab === "forecast" ? (
+            <ForecastTab ticker={ticker} />
           ) : (
             <div className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">
               <div className="text-center">
