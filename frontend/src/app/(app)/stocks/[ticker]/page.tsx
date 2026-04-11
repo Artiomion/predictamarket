@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SignalBadge } from "@/components/ui/signal-badge"
+import { StockChart } from "@/components/charts/StockChart"
 import { PriceChange } from "@/components/ui/price-change"
 import { mockInstruments, mockPrices, mockSignals } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
@@ -145,15 +146,20 @@ export default function StockPage() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle"
         >
-          <div className="text-center">
-            {placeholder.locked && (
-              <Lock className="mx-auto mb-3 size-5 text-text-muted" />
-            )}
-            <p className="text-sm text-text-muted">{placeholder.title}</p>
-            <p className="mt-1 text-xs text-text-muted">{placeholder.subtitle}</p>
-          </div>
+          {activeTab === "chart" ? (
+            <StockChart />
+          ) : (
+            <div className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">
+              <div className="text-center">
+                {placeholder.locked && (
+                  <Lock className="mx-auto mb-3 size-5 text-text-muted" />
+                )}
+                <p className="text-sm text-text-muted">{placeholder.title}</p>
+                <p className="mt-1 text-xs text-text-muted">{placeholder.subtitle}</p>
+              </div>
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>

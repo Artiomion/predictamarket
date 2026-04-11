@@ -100,6 +100,32 @@ export const mockNews: NewsArticle[] = [
   },
 ];
 
+// ── Price History (OHLCV for TradingView chart) ──────
+export const mockPriceHistory = [
+  { date: '2026-03-10', open: 255.0, high: 258.0, low: 253.5, close: 257.2, volume: 38000000 },
+  { date: '2026-03-11', open: 257.5, high: 260.1, low: 256.8, close: 259.0, volume: 42000000 },
+  { date: '2026-03-12', open: 258.2, high: 259.5, low: 254.0, close: 255.8, volume: 36000000 },
+  { date: '2026-03-13', open: 255.0, high: 256.3, low: 249.5, close: 250.1, volume: 45000000 },
+  { date: '2026-03-14', open: 251.0, high: 253.8, low: 249.9, close: 252.8, volume: 32000000 },
+  { date: '2026-03-17', open: 253.0, high: 255.1, low: 252.2, close: 254.2, volume: 31000000 },
+  { date: '2026-03-18', open: 252.6, high: 254.9, low: 249.0, close: 249.9, volume: 35000000 },
+  { date: '2026-03-19', open: 249.4, high: 251.8, low: 247.3, close: 249.0, volume: 34000000 },
+  { date: '2026-03-20', open: 248.0, high: 249.2, low: 246.0, close: 248.0, volume: 38000000 },
+  { date: '2026-03-24', open: 250.4, high: 254.8, low: 249.6, close: 251.6, volume: 45000000 },
+  { date: '2026-03-25', open: 254.1, high: 255.0, low: 251.6, close: 252.6, volume: 28000000 },
+  { date: '2026-03-26', open: 252.1, high: 257.0, low: 250.8, close: 252.9, volume: 41000000 },
+  { date: '2026-03-27', open: 253.9, high: 255.5, low: 248.1, close: 248.8, volume: 47000000 },
+  { date: '2026-03-31', open: 247.9, high: 255.5, low: 247.1, close: 253.8, volume: 49000000 },
+  { date: '2026-04-01', open: 254.1, high: 256.2, low: 253.3, close: 255.6, volume: 40000000 },
+  { date: '2026-04-02', open: 254.2, high: 256.1, low: 250.6, close: 255.9, volume: 31000000 },
+  { date: '2026-04-03', open: 256.0, high: 258.5, low: 254.8, close: 257.3, volume: 33000000 },
+  { date: '2026-04-04', open: 257.8, high: 259.2, low: 256.5, close: 258.1, volume: 29000000 },
+  { date: '2026-04-07', open: 256.2, high: 256.2, low: 245.7, close: 253.5, volume: 62000000 },
+  { date: '2026-04-08', open: 258.5, high: 259.8, low: 256.5, close: 258.9, volume: 41000000 },
+  { date: '2026-04-09', open: 259.0, high: 261.1, low: 256.1, close: 260.5, volume: 28000000 },
+  { date: '2026-04-10', open: 260.0, high: 262.2, low: 259.1, close: 259.5, volume: 12900000 },
+];
+
 // ── Earnings ──────────────────────────────────────────
 export const mockUpcomingEarnings = [
   { ticker: 'MSFT', name: 'Microsoft',    report_date: '2026-04-22', eps_estimate: 3.22 },
