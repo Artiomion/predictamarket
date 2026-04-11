@@ -239,6 +239,28 @@ export interface Notification {
   created_at: string;
 }
 
+// ── Insider ───────────────────────────────────────────
+
+export interface InsiderTransaction {
+  insider_name: string;
+  title: string;
+  transaction_type: 'buy' | 'sell';
+  shares: number;
+  price: number;
+  total_value: number;
+  date: string;
+  ticker: string;
+}
+
+// ── Landing ───────────────────────────────────────────
+
+export interface LandingStats {
+  tickers_count: number;
+  model_accuracy: number;
+  avg_return: number;
+  total_forecasts: number;
+}
+
 // ── Pagination ────────────────────────────────────────
 
 export interface PaginatedResponse<T> {

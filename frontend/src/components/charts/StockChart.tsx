@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, type ISeriesApi, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from "lightweight-charts"
 import { cn } from "@/lib/utils"
+import { colors } from "@/lib/design-tokens"
 import { mockPriceHistory } from "@/lib/mock-data"
 
 const timeframes = [
@@ -36,8 +37,8 @@ export function StockChart() {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#0A0A0F" },
-        textColor: "#6B6B80",
+        background: { type: ColorType.Solid, color: colors.bg.primary },
+        textColor: colors.text.secondary,
         fontFamily: "'DM Sans', sans-serif",
         fontSize: 11,
       },
@@ -47,25 +48,25 @@ export function StockChart() {
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#12121A" },
-        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#12121A" },
+        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
+        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
       },
       rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.06)",
+        borderColor: colors.border.subtle,
         scaleMargins: { top: 0.05, bottom: 0.25 },
       },
       timeScale: {
-        borderColor: "rgba(255,255,255,0.06)",
+        borderColor: colors.border.subtle,
         timeVisible: false,
       },
       handleScroll: { vertTouchDrag: false },
     })
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#00FF88",
-      downColor: "#FF3366",
-      wickUpColor: "#00FF88",
-      wickDownColor: "#FF3366",
+      upColor: colors.success,
+      downColor: colors.danger,
+      wickUpColor: colors.success,
+      wickDownColor: colors.danger,
       borderVisible: false,
     })
 

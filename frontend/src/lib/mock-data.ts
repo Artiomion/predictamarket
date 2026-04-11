@@ -1,4 +1,4 @@
-import type { User, Instrument, Forecast, Portfolio, Position, NewsArticle, Alert, TopPick } from '@/types';
+import type { User, Instrument, Forecast, Portfolio, Position, NewsArticle, Alert, TopPick, InsiderTransaction, LandingStats } from '@/types';
 
 // ── Auth ──────────────────────────────────────────────
 export const mockUser: User = {
@@ -243,7 +243,7 @@ export const mockAlerts: Alert[] = [
 ];
 
 // ── Insider Transactions ─────────────────────────────
-export const mockInsiderTransactions = [
+export const mockInsiderTransactions: InsiderTransaction[] = [
   { insider_name: 'Tim Cook', title: 'CEO', transaction_type: 'sell' as const, shares: 75000, price: 258.50, total_value: 19387500, date: '2026-04-08', ticker: 'AAPL' },
   { insider_name: 'Luca Maestri', title: 'CFO', transaction_type: 'sell' as const, shares: 30000, price: 255.20, total_value: 7656000, date: '2026-03-28', ticker: 'AAPL' },
   { insider_name: 'Jeff Williams', title: 'COO', transaction_type: 'buy' as const, shares: 10000, price: 248.00, total_value: 2480000, date: '2026-03-20', ticker: 'AAPL' },
@@ -252,7 +252,7 @@ export const mockInsiderTransactions = [
 ];
 
 // ── Landing Page Stats ────────────────────────────────
-export const mockLandingStats = {
+export const mockLandingStats: LandingStats = {
   tickers_count: 94,
   model_accuracy: 99.5,
   avg_return: 77.7,

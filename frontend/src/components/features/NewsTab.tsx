@@ -4,21 +4,12 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { FilterChip } from "@/components/ui/filter-chip"
+import { timeAgo } from "@/lib/formatters"
+import { SENTIMENT_VARIANTS, IMPACT_STYLES } from "@/lib/constants"
 import { mockNews } from "@/lib/mock-data"
 import type { Sentiment } from "@/types"
 import { cn } from "@/lib/utils"
-
-const sentimentVariant: Record<string, "success" | "danger" | "secondary"> = {
-  positive: "success",
-  negative: "danger",
-  neutral: "secondary",
-}
-
-const impactColors: Record<string, string> = {
-  high: "border-danger text-danger",
-  medium: "border-border-subtle text-text-muted",
-  low: "border-border-subtle text-text-muted",
-}
 
 const filters: { id: Sentiment | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -26,15 +17,6 @@ const filters: { id: Sentiment | "all"; label: string }[] = [
   { id: "negative", label: "Negative" },
   { id: "neutral", label: "Neutral" },
 ]
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const hours = Math.floor(diff / 3600000)
-  if (hours < 1) return "Just now"
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
 
 export function NewsTab({ ticker }: { ticker: string }) {
   const [filter, setFilter] = useState<Sentiment | "all">("all")
@@ -49,23 +31,10 @@ export function NewsTab({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-4">
       {/* Filter chips */}
-      <div className="flex items-center gap-1">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={cn(
-              "rounded-chip px-3 py-1 text-xs font-medium transition-colors duration-150",
-              filter === f.id
-                ? "bg-bg-elevated text-text-primary"
-                : "text-text-muted hover:text-text-secondary"
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <FilterChip options={filters} value={filter} onChange={setFilter} label="Sentiment" />
         {isGeneral && (
-          <span className="ml-2 text-xs text-text-muted">Showing general market news</span>
+          <span className="text-xs text-text-muted">Showing general market news</span>
         )}
       </div>
 
@@ -103,11 +72,11 @@ export function NewsTab({ ticker }: { ticker: string }) {
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {article.impact === "high" && (
-                    <Badge variant="outline" className={cn("text-[10px]", impactColors.high)}>
+                    <Badge variant="outline" className={cn("text-[10px]", IMPACT_STYLES.high)}>
                       HIGH
                     </Badge>
                   )}
-                  <Badge variant={sentimentVariant[article.sentiment]} className="text-[10px]">
+                  <Badge variant={SENTIMENT_VARIANTS[article.sentiment]} className="text-[10px]">
                     {article.sentiment}
                   </Badge>
                 </div>

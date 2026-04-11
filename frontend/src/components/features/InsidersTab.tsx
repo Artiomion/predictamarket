@@ -3,13 +3,8 @@
 import { motion } from "framer-motion"
 import { Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { formatValue } from "@/lib/formatters"
 import { mockInsiderTransactions } from "@/lib/mock-data"
-
-function formatValue(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
-  return `$${value.toLocaleString("en-US")}`
-}
 
 export function InsidersTab({ ticker }: { ticker: string }) {
   const transactions = mockInsiderTransactions

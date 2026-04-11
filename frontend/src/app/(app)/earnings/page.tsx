@@ -5,21 +5,9 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { CalendarDays } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { formatCountdown } from "@/lib/formatters"
 import { mockUpcomingEarnings } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
-
-function getCountdown(dateStr: string): { label: string; variant: "danger" | "warning" | "secondary"; urgent: boolean } {
-  const diff = new Date(dateStr).getTime() - Date.now()
-  const days = Math.ceil(diff / 86400000)
-  if (days <= 0) return { label: "Today", variant: "danger", urgent: true }
-  if (days === 1) return { label: "Tomorrow", variant: "warning", urgent: false }
-  if (days <= 7) return { label: `In ${days} days`, variant: "secondary", urgent: false }
-  return {
-    label: new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    variant: "secondary",
-    urgent: false,
-  }
-}
 
 export default function EarningsPage() {
   const sorted = useMemo(() => {
@@ -58,7 +46,7 @@ export default function EarningsPage() {
             </thead>
             <tbody>
               {sorted.map((e, i) => {
-                const countdown = getCountdown(e.report_date)
+                const countdown = formatCountdown(e.report_date)
                 const isNear = countdown.variant === "danger" || countdown.variant === "warning"
 
                 return (

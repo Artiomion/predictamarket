@@ -16,11 +16,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { SECTOR_COLORS } from "@/lib/constants"
 import { mockInstruments, mockSectors } from "@/lib/mock-data"
 import type { Position } from "@/types"
 import { cn } from "@/lib/utils"
-
-const SECTOR_COLORS = ["#00D4AA", "#00A3FF", "#FFB800", "#FF3366", "#6B6B80"]
 
 interface PortfolioDetailProps {
   initialPositions: Position[]

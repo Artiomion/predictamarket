@@ -6,21 +6,12 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { TickerBadge } from "@/components/ui/ticker-badge"
+import { FilterChip } from "@/components/ui/filter-chip"
+import { timeAgo } from "@/lib/formatters"
+import { SENTIMENT_VARIANTS, IMPACT_STYLES } from "@/lib/constants"
 import { mockNews } from "@/lib/mock-data"
 import type { Sentiment, Impact } from "@/types"
 import { cn } from "@/lib/utils"
-
-const sentimentVariant: Record<string, "success" | "danger" | "secondary"> = {
-  positive: "success",
-  negative: "danger",
-  neutral: "secondary",
-}
-
-const impactStyle: Record<string, string> = {
-  high: "border-danger text-danger",
-  medium: "border-border-subtle text-text-muted",
-  low: "border-border-subtle text-text-muted",
-}
 
 const sentimentFilters: { id: Sentiment | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -35,17 +26,6 @@ const impactFilters: { id: Impact | "all"; label: string }[] = [
   { id: "medium", label: "Medium" },
   { id: "low", label: "Low" },
 ]
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins} minutes ago`
-  const hours = Math.floor(diff / 3600000)
-  if (hours < 24) return `${hours} hours ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} days ago`
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
 
 export default function NewsPage() {
   const [sentiment, setSentiment] = useState<Sentiment | "all">("all")
@@ -70,40 +50,8 @@ export default function NewsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4">
-        <div className="flex items-center gap-1">
-          <span className="mr-1 text-xs text-text-muted">Sentiment:</span>
-          {sentimentFilters.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setSentiment(f.id)}
-              className={cn(
-                "rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
-                sentiment === f.id
-                  ? "bg-bg-elevated text-text-primary"
-                  : "text-text-muted hover:text-text-secondary"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="mr-1 text-xs text-text-muted">Impact:</span>
-          {impactFilters.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setImpact(f.id)}
-              className={cn(
-                "rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
-                impact === f.id
-                  ? "bg-bg-elevated text-text-primary"
-                  : "text-text-muted hover:text-text-secondary"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <FilterChip options={sentimentFilters} value={sentiment} onChange={setSentiment} label="Sentiment" />
+        <FilterChip options={impactFilters} value={impact} onChange={setImpact} label="Impact" />
       </div>
 
       {/* Articles */}
@@ -148,11 +96,11 @@ export default function NewsPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {article.impact === "high" && (
-                      <Badge variant="outline" className={cn("text-[10px]", impactStyle.high)}>
+                      <Badge variant="outline" className={cn("text-[10px]", IMPACT_STYLES.high)}>
                         HIGH
                       </Badge>
                     )}
-                    <Badge variant={sentimentVariant[article.sentiment]} className="text-[10px]">
+                    <Badge variant={SENTIMENT_VARIANTS[article.sentiment]} className="text-[10px]">
                       {article.sentiment}
                       <span className="ml-1 opacity-60">{article.sentiment_score.toFixed(2)}</span>
                     </Badge>

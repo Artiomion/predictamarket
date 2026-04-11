@@ -3,22 +3,9 @@
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
+import { timeAgo } from "@/lib/formatters"
+import { SENTIMENT_VARIANTS } from "@/lib/constants"
 import { mockNews } from "@/lib/mock-data"
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const hours = Math.floor(diff / 3600000)
-  if (hours < 1) return "Just now"
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
-const sentimentVariant: Record<string, "success" | "danger" | "secondary"> = {
-  positive: "success",
-  negative: "danger",
-  neutral: "secondary",
-}
 
 export function MarketNews() {
   const articles = mockNews.slice(0, 3)
@@ -52,7 +39,7 @@ export function MarketNews() {
               <span className="text-xs text-text-muted">{article.source}</span>
               <span className="text-xs text-text-muted">&middot;</span>
               <span className="text-xs text-text-muted">{timeAgo(article.published_at)}</span>
-              <Badge variant={sentimentVariant[article.sentiment]} className="ml-auto text-[10px]">
+              <Badge variant={SENTIMENT_VARIANTS[article.sentiment]} className="ml-auto text-[10px]">
                 {article.sentiment}
               </Badge>
             </div>

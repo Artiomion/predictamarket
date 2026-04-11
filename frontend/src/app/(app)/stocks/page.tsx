@@ -7,6 +7,8 @@ import { Search, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SignalBadge } from "@/components/ui/signal-badge"
 import { PriceChange } from "@/components/ui/price-change"
+import { FilterChip } from "@/components/ui/filter-chip"
+import { formatMarketCap } from "@/lib/formatters"
 import { mockInstruments, mockPrices, mockSignals } from "@/lib/mock-data"
 import type { Signal } from "@/types"
 import { cn } from "@/lib/utils"
@@ -20,12 +22,6 @@ const signalFilter: { id: Signal | "all"; label: string }[] = [
   { id: "SELL", label: "SELL" },
   { id: "HOLD", label: "HOLD" },
 ]
-
-function formatMarketCap(cap: number): string {
-  if (cap >= 1e12) return `$${(cap / 1e12).toFixed(1)}T`
-  if (cap >= 1e9) return `$${(cap / 1e9).toFixed(0)}B`
-  return `$${(cap / 1e6).toFixed(0)}M`
-}
 
 const columns: { id: SortField; label: string; align?: "right"; hideMobile?: boolean }[] = [
   { id: "ticker", label: "Ticker" },
@@ -114,42 +110,14 @@ export default function StocksPage() {
         </div>
 
         <div className="flex flex-wrap gap-4">
-          {/* Signal filter */}
-          <div className="flex items-center gap-1">
-            <span className="mr-1 text-xs text-text-muted">Signal:</span>
-            {signalFilter.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setSignalFilterVal(f.id)}
-                className={cn(
-                  "rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
-                  signalFilterVal === f.id
-                    ? "bg-bg-elevated text-text-primary"
-                    : "text-text-muted hover:text-text-secondary"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Sector filter */}
+          <FilterChip options={signalFilter} value={signalFilterVal} onChange={setSignalFilterVal} label="Signal" />
           <div className="flex items-center gap-1 overflow-x-auto">
-            <span className="mr-1 shrink-0 text-xs text-text-muted">Sector:</span>
-            {sectors.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSectorFilter(s)}
-                className={cn(
-                  "shrink-0 rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
-                  sectorFilter === s
-                    ? "bg-bg-elevated text-text-primary"
-                    : "text-text-muted hover:text-text-secondary"
-                )}
-              >
-                {s === "all" ? "All" : s}
-              </button>
-            ))}
+            <FilterChip
+              options={sectors.map((s) => ({ id: s, label: s === "all" ? "All" : s }))}
+              value={sectorFilter}
+              onChange={setSectorFilter}
+              label="Sector"
+            />
           </div>
         </div>
       </div>

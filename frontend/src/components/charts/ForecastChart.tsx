@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { createChart, type IChartApi, ColorType, CrosshairMode, CandlestickSeries, LineSeries, AreaSeries, LineStyle } from "lightweight-charts"
+import { colors } from "@/lib/design-tokens"
 import { mockPriceHistory } from "@/lib/mock-data"
 import type { Forecast } from "@/types"
 
@@ -29,8 +30,8 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#0A0A0F" },
-        textColor: "#6B6B80",
+        background: { type: ColorType.Solid, color: colors.bg.primary },
+        textColor: colors.text.secondary,
         fontFamily: "'DM Sans', sans-serif",
         fontSize: 11,
       },
@@ -40,14 +41,14 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#12121A" },
-        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#12121A" },
+        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
+        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
       },
       rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.06)",
+        borderColor: colors.border.subtle,
       },
       timeScale: {
-        borderColor: "rgba(255,255,255,0.06)",
+        borderColor: colors.border.subtle,
         timeVisible: false,
       },
       handleScroll: { vertTouchDrag: false },
@@ -55,10 +56,10 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
 
     // Candlestick series (historical data)
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#00FF88",
-      downColor: "#FF3366",
-      wickUpColor: "#00FF88",
-      wickDownColor: "#FF3366",
+      upColor: colors.success,
+      downColor: colors.danger,
+      wickUpColor: colors.success,
+      wickDownColor: colors.danger,
       borderVisible: false,
     })
 
@@ -75,7 +76,7 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
     // Forecast line (dashed, starts from last candle)
     const lastDate = mockPriceHistory[mockPriceHistory.length - 1].date
     const forecastLine = chart.addSeries(LineSeries, {
-      color: "#00D4AA",
+      color: colors.accent.from,
       lineWidth: 2,
       lineStyle: LineStyle.Dashed,
       crosshairMarkerVisible: false,

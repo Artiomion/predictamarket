@@ -3,17 +3,8 @@
 import { motion } from "framer-motion"
 import { Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { formatCountdown } from "@/lib/formatters"
 import { mockUpcomingEarnings } from "@/lib/mock-data"
-
-function formatCountdown(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now()
-  const days = Math.ceil(diff / 86400000)
-  if (days < 0) return "Reported"
-  if (days === 0) return "Today"
-  if (days === 1) return "Tomorrow"
-  if (days <= 7) return `In ${days} days`
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
 
 export function EarningsTab({ ticker }: { ticker: string }) {
   const upcoming = mockUpcomingEarnings.filter((e) => e.ticker === ticker)
@@ -63,8 +54,8 @@ export function EarningsTab({ ticker }: { ticker: string }) {
                     ${e.eps_estimate.toFixed(2)}
                   </p>
                 </div>
-                <Badge variant="secondary" className="font-mono text-[10px]">
-                  {formatCountdown(e.report_date)}
+                <Badge variant={formatCountdown(e.report_date).variant} className="font-mono text-[10px]">
+                  {formatCountdown(e.report_date).label}
                 </Badge>
               </div>
             </motion.div>
