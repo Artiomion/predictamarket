@@ -218,6 +218,11 @@ export const mockPositions: Position[] = [
   { id: '3', ticker: 'NVDA', quantity: 20, avg_buy_price: 180.00, current_price: 188.85, pnl: 177.00, pnl_pct: 4.92 },
 ];
 
+export const mockSectors = [
+  { sector: 'Technology', value: 12530.40, percentage: 81.3, positions_count: 3 },
+  { sector: 'Financial Services', value: 2890.10, percentage: 18.7, positions_count: 1 },
+];
+
 // ── Watchlist ─────────────────────────────────────────
 export const mockWatchlists = [
   {

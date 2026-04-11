@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { PortfolioDetail } from "@/components/features/PortfolioDetail"
 import { mockPortfolios, mockPositions } from "@/lib/mock-data"
 import type { Portfolio } from "@/types"
 
@@ -145,40 +146,7 @@ export default function PortfolioPage() {
                         className="overflow-hidden border-t border-border-subtle"
                       >
                         <div className="px-5 py-4">
-                          {mockPositions.length === 0 ? (
-                            <p className="text-center text-sm text-text-muted py-4">
-                              No positions yet. Add stocks to track them here.
-                            </p>
-                          ) : (
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-left text-xs text-text-muted">
-                                  <th className="pb-2 font-medium">Ticker</th>
-                                  <th className="pb-2 text-right font-medium">Qty</th>
-                                  <th className="hidden pb-2 text-right font-medium sm:table-cell">Avg Price</th>
-                                  <th className="pb-2 text-right font-medium">Current</th>
-                                  <th className="pb-2 text-right font-medium">P&L</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {mockPositions.map((pos) => (
-                                  <tr key={pos.id} className="border-t border-border-subtle">
-                                    <td className="py-2.5 font-mono text-xs font-medium">{pos.ticker}</td>
-                                    <td className="py-2.5 text-right font-mono text-xs tabular-nums">{pos.quantity}</td>
-                                    <td className="hidden py-2.5 text-right font-mono text-xs tabular-nums text-text-secondary sm:table-cell">
-                                      ${pos.avg_buy_price.toFixed(2)}
-                                    </td>
-                                    <td className="py-2.5 text-right font-mono text-xs tabular-nums">
-                                      ${pos.current_price.toFixed(2)}
-                                    </td>
-                                    <td className="py-2.5 text-right">
-                                      <PriceChange value={pos.pnl_pct} className="text-xs" />
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
+                          <PortfolioDetail initialPositions={mockPositions} />
                         </div>
                       </motion.div>
                     )}
