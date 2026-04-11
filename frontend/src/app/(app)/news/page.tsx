@@ -1,0 +1,204 @@
+"use client"
+
+import { useState, useMemo } from "react"
+import Link from "next/link"
+import { motion, AnimatePresence } from "framer-motion"
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { TickerBadge } from "@/components/ui/ticker-badge"
+import { mockNews } from "@/lib/mock-data"
+import type { Sentiment, Impact } from "@/types"
+import { cn } from "@/lib/utils"
+
+const sentimentVariant: Record<string, "success" | "danger" | "secondary"> = {
+  positive: "success",
+  negative: "danger",
+  neutral: "secondary",
+}
+
+const impactStyle: Record<string, string> = {
+  high: "border-danger text-danger",
+  medium: "border-border-subtle text-text-muted",
+  low: "border-border-subtle text-text-muted",
+}
+
+const sentimentFilters: { id: Sentiment | "all"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "positive", label: "Positive" },
+  { id: "negative", label: "Negative" },
+  { id: "neutral", label: "Neutral" },
+]
+
+const impactFilters: { id: Impact | "all"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "high", label: "High" },
+  { id: "medium", label: "Medium" },
+  { id: "low", label: "Low" },
+]
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins} minutes ago`
+  const hours = Math.floor(diff / 3600000)
+  if (hours < 24) return `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} days ago`
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+export default function NewsPage() {
+  const [sentiment, setSentiment] = useState<Sentiment | "all">("all")
+  const [impact, setImpact] = useState<Impact | "all">("all")
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    return mockNews.filter((a) => {
+      if (sentiment !== "all" && a.sentiment !== sentiment) return false
+      if (impact !== "all" && a.impact !== impact) return false
+      return true
+    })
+  }, [sentiment, impact])
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-baseline gap-2">
+        <h1 className="font-heading text-2xl font-semibold">Market News</h1>
+        <span className="text-sm text-text-muted">({filtered.length})</span>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex items-center gap-1">
+          <span className="mr-1 text-xs text-text-muted">Sentiment:</span>
+          {sentimentFilters.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setSentiment(f.id)}
+              className={cn(
+                "rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
+                sentiment === f.id
+                  ? "bg-bg-elevated text-text-primary"
+                  : "text-text-muted hover:text-text-secondary"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="mr-1 text-xs text-text-muted">Impact:</span>
+          {impactFilters.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setImpact(f.id)}
+              className={cn(
+                "rounded-chip px-2.5 py-1 text-xs font-medium transition-colors duration-150",
+                impact === f.id
+                  ? "bg-bg-elevated text-text-primary"
+                  : "text-text-muted hover:text-text-secondary"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Articles */}
+      <div className="space-y-3">
+        <AnimatePresence mode="popLayout">
+          {filtered.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex min-h-[30vh] items-center justify-center rounded-card border border-dashed border-border-subtle"
+            >
+              <p className="text-sm text-text-muted">No articles match your filters</p>
+            </motion.div>
+          ) : (
+            filtered.map((article, i) => (
+              <motion.div
+                key={article.id}
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: i * 0.04, duration: 0.3, ease: "easeOut" }}
+                className="rounded-card border border-border-subtle bg-bg-surface p-5 transition-colors hover:border-border-hover"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group inline-flex items-start gap-1.5 font-medium leading-snug hover:text-[var(--accent-from)]"
+                    >
+                      {article.title}
+                      <ExternalLink className="mt-1 size-3 shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+                    </a>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+                      <span>{article.source}</span>
+                      <span>&middot;</span>
+                      <span>{timeAgo(article.published_at)}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {article.impact === "high" && (
+                      <Badge variant="outline" className={cn("text-[10px]", impactStyle.high)}>
+                        HIGH
+                      </Badge>
+                    )}
+                    <Badge variant={sentimentVariant[article.sentiment]} className="text-[10px]">
+                      {article.sentiment}
+                      <span className="ml-1 opacity-60">{article.sentiment_score.toFixed(2)}</span>
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Tickers */}
+                {article.tickers.length > 0 && (
+                  <div className="mt-3 flex items-center gap-1.5">
+                    {article.tickers.map((t) => (
+                      <Link key={t} href={`/stocks/${t}`}>
+                        <TickerBadge ticker={t} />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expandable summary */}
+                {article.summary && (
+                  <>
+                    <button
+                      onClick={() => setExpanded(expanded === article.id ? null : article.id)}
+                      className="mt-3 flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary"
+                    >
+                      {expanded === article.id ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                      {expanded === article.id ? "Hide summary" : "Show summary"}
+                    </button>
+                    <AnimatePresence>
+                      {expanded === article.id && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-2 text-sm text-text-secondary leading-relaxed overflow-hidden"
+                        >
+                          {article.summary}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
