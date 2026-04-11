@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface PriceChangeProps {
-  value: number
+  value: number | null | undefined
   prefix?: string
   className?: string
 }
 
 export function PriceChange({ value, prefix = "", className }: PriceChangeProps) {
+  if (value == null) return <span className={cn("font-mono text-sm text-text-muted", className)}>—</span>
   const isPositive = value > 0
   const isZero = value === 0
   const formatted = `${isPositive ? "+" : ""}${value.toFixed(2)}%`

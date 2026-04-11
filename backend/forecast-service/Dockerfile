@@ -4,8 +4,10 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
 
-COPY forecast-service/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-base.txt ./requirements-base.txt
+COPY forecast-service/requirements.txt ./requirements-service.txt
+RUN pip install --no-cache-dir -r requirements-base.txt \
+    && grep -v "requirements-base" requirements-service.txt | pip install --no-cache-dir -r /dev/stdin
 
 # Pre-download FinBERT model at build time
 RUN python -c "from transformers import AutoTokenizer, AutoModel; \

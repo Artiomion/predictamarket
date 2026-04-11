@@ -221,7 +221,7 @@ export const forecastApi = {
   getForecast: (ticker: string) =>
     api.get<Forecast>(`/api/forecast/${ticker}`),
   createForecast: (ticker: string) =>
-    api.post<Forecast>(`/api/forecast/${ticker}`),
+    api.post<Forecast>(`/api/forecast/${ticker}`, null, { timeout: 60000 }),
   getForecastHistory: (ticker: string, params?: { limit?: number }) =>
     api.get(`/api/forecast/${ticker}/history`, { params }),
   createBatch: (tickers: string[]) =>

@@ -1,37 +1,47 @@
 "use client"
 
-import { useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { SignalBadge } from "@/components/ui/signal-badge"
 import { PriceChange } from "@/components/ui/price-change"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SparkLine, generateSparkData } from "@/components/charts/SparkLine"
-import { mockTopPicks, mockPrices } from "@/lib/mock-data"
+import { forecastApi } from "@/lib/api"
+import { useAuthStore } from "@/store/auth-store"
+import type { TopPick } from "@/types"
 
 export function TopPicks() {
+  const [picks, setPicks] = useState<TopPick[]>([])
+  const [loading, setLoading] = useState(true)
+  const tier = useAuthStore((s) => s.user?.tier ?? "free")
+
+  useEffect(() => {
+    const limit = tier === "free" ? 5 : 20
+    forecastApi.getTopPicks({ limit })
+      .then(({ data }) => setPicks(data))
+      .catch(() => setPicks([]))
+      .finally(() => setLoading(false))
+  }, [tier])
+
   const sparkData = useMemo(
-    () => mockTopPicks.map(() => generateSparkData(20)),
-    []
+    () => picks.map(() => generateSparkData(20)),
+    [picks.length] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   return (
     <div className="rounded-card border border-border-subtle bg-bg-surface">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="flex items-center gap-2">
           <h2 className="font-heading text-base font-medium">Top Picks</h2>
           <Badge variant="default" className="text-[10px]">AI-Ranked</Badge>
         </div>
-        <Link
-          href="/top-picks"
-          className="text-xs text-text-muted transition-colors hover:text-[var(--accent-from)]"
-        >
+        <Link href="/top-picks" className="text-xs text-text-muted transition-colors hover:text-[var(--accent-from)]">
           View all
         </Link>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -46,9 +56,26 @@ export function TopPicks() {
             </tr>
           </thead>
           <tbody>
-            {mockTopPicks.map((pick, i) => {
-              const price = mockPrices[pick.ticker]
-              return (
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-border-subtle">
+                  <td className="px-5 py-3"><Skeleton className="h-4 w-4" /></td>
+                  <td className="px-2 py-3"><Skeleton className="h-4 w-12" /></td>
+                  <td className="hidden px-2 py-3 sm:table-cell"><Skeleton className="h-4 w-28" /></td>
+                  <td className="px-2 py-3"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                  <td className="hidden px-2 py-3 md:table-cell"><Skeleton className="h-4 w-20" /></td>
+                  <td className="px-2 py-3"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                  <td className="px-5 py-3"><Skeleton className="h-4 w-14 ml-auto" /></td>
+                </tr>
+              ))
+            ) : picks.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-8 text-center text-sm text-text-muted">
+                  No top picks available yet
+                </td>
+              </tr>
+            ) : (
+              picks.map((pick, i) => (
                 <motion.tr
                   key={pick.ticker}
                   initial={{ opacity: 0, y: 6 }}
@@ -62,30 +89,28 @@ export function TopPicks() {
                     </Link>
                   </td>
                   <td className="px-2 py-3">
-                    <Link href={`/stocks/${pick.ticker}`} className="block">
-                      <span className="font-mono text-xs font-medium">{pick.ticker}</span>
+                    <Link href={`/stocks/${pick.ticker}`} className="block font-mono text-xs font-medium">
+                      {pick.ticker}
                     </Link>
                   </td>
                   <td className="hidden px-2 py-3 sm:table-cell">
-                    <Link href={`/stocks/${pick.ticker}`} className="block">
-                      <span className="text-text-secondary">{pick.name}</span>
+                    <Link href={`/stocks/${pick.ticker}`} className="block text-text-secondary">
+                      {pick.name}
                     </Link>
                   </td>
                   <td className="px-2 py-3 text-right">
-                    <Link href={`/stocks/${pick.ticker}`} className="block">
-                      <span className="font-mono text-xs tabular-nums">
-                        ${price?.price.toLocaleString("en-US", { minimumFractionDigits: 2 }) ?? "—"}
-                      </span>
+                    <Link href={`/stocks/${pick.ticker}`} className="block font-mono text-xs tabular-nums">
+                      ${pick.current_close?.toLocaleString("en-US", { minimumFractionDigits: 2 }) ?? "—"}
                     </Link>
                   </td>
                   <td className="hidden px-2 py-3 md:table-cell">
                     <Link href={`/stocks/${pick.ticker}`} className="block">
-                      <SparkLine data={sparkData[i]} />
+                      {sparkData[i] && <SparkLine data={sparkData[i]} />}
                     </Link>
                   </td>
                   <td className="px-2 py-3 text-right">
                     <Link href={`/stocks/${pick.ticker}`} className="block">
-                      <PriceChange value={pick.predicted_return_1m} prefix="" />
+                      <PriceChange value={pick.predicted_return_1m} />
                     </Link>
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -94,8 +119,8 @@ export function TopPicks() {
                     </Link>
                   </td>
                 </motion.tr>
-              )
-            })}
+              ))
+            )}
           </tbody>
         </table>
       </div>
