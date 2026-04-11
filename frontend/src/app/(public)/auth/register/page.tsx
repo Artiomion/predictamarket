@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Eye, EyeOff } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { authApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth-store"
-import { mockUser, mockToken } from "@/lib/mock-data"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -30,16 +31,35 @@ export default function RegisterPage() {
     return Object.keys(errs).length === 0
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
 
     setLoading(true)
-    setTimeout(() => {
-      setUser({ ...mockUser, full_name: name, email })
-      setAuth(mockToken, "mock-refresh-token")
+    try {
+      const { data } = await authApi.register({ email, password, name })
+      setAuth(data.access_token, data.refresh_token)
+
+      // Fetch user profile
+      const { data: user } = await authApi.getMe()
+      setUser(user)
+
       router.push("/dashboard")
-    }, 500)
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { detail?: string } } }
+      if (error.response?.status === 400) {
+        toast.error("An account with this email already exists")
+      } else if (error.response?.status === 422) {
+        const detail = error.response.data?.detail
+        if (typeof detail === "string") {
+          setErrors({ form: detail })
+        } else {
+          setErrors({ form: "Please check your input" })
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -51,7 +71,6 @@ export default function RegisterPage() {
         className="w-full max-w-[420px]"
       >
         <div className="rounded-modal border border-border-subtle bg-bg-surface p-8">
-          {/* Logo */}
           <div className="flex items-center justify-center gap-2">
             <span className="flex size-8 items-center justify-center rounded-button bg-gradient-to-br from-accent-from to-accent-to font-heading text-sm font-bold text-bg-primary">
               PM
@@ -66,7 +85,6 @@ export default function RegisterPage() {
             Start predicting S&P 500 stocks for free
           </p>
 
-          {/* Google OAuth placeholder */}
           <button
             disabled
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-button border border-border-subtle bg-bg-elevated px-4 py-2.5 text-sm text-text-muted opacity-50 cursor-not-allowed"
@@ -75,7 +93,6 @@ export default function RegisterPage() {
             Continue with Google
           </button>
 
-          {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border-subtle" />
@@ -85,7 +102,10 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Form */}
+          {errors.form && (
+            <p className="mb-4 text-center text-xs text-danger">{errors.form}</p>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="name" className="mb-1.5 block text-sm text-text-secondary">Name</label>

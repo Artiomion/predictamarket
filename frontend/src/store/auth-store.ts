@@ -32,21 +32,9 @@ interface AuthState {
   hydrate: () => void
 }
 
-// Default mock user for development (used when no localStorage data)
-const MOCK_USER: User = {
-  id: "dbba3ca9-f491-48a9-a9e0-da4b7e0e5cd9",
-  email: "demo@predictamarket.com",
-  full_name: "Test User",
-  avatar_url: null,
-  tier: "free",
-  is_active: true,
-  is_verified: true,
-  created_at: "2026-04-01T00:00:00Z",
-}
-
 export const useAuthStore = create<AuthState>((set) => ({
-  user: MOCK_USER,
-  token: "mock-jwt-token-for-dev",
+  user: null,
+  token: null,
   refreshToken: null,
   hydrated: false,
 
