@@ -12,7 +12,7 @@ import { mockUser, mockToken } from "@/lib/mock-data"
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { setUser, setToken } = useAuthStore()
+  const { setUser, setAuth } = useAuthStore()
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setLoading(true)
     setTimeout(() => {
       setUser({ ...mockUser, full_name: name, email })
-      setToken(mockToken)
+      setAuth(mockToken, "mock-refresh-token")
       router.push("/dashboard")
     }, 500)
   }

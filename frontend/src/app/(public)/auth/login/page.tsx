@@ -12,7 +12,7 @@ import { mockUser, mockToken } from "@/lib/mock-data"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { setUser, setToken } = useAuthStore()
+  const { setUser, setAuth } = useAuthStore()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -40,7 +40,7 @@ export default function LoginPage() {
         return
       }
       setUser(mockUser)
-      setToken(mockToken)
+      setAuth(mockToken, "mock-refresh-token")
       router.push("/dashboard")
     }, 500)
   }
