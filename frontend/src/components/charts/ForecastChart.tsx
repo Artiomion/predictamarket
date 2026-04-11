@@ -119,7 +119,8 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
         chart.resize(width, width < 640 ? 280 : 360)
       }
     })
-    observer.observe(containerRef.current)
+    const container = containerRef.current
+    if (container) observer.observe(container)
 
     return () => {
       observer.disconnect()

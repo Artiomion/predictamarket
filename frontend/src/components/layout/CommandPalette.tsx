@@ -34,18 +34,18 @@ const pages = [
 
 export function CommandPalette() {
   const router = useRouter()
-  const { commandPaletteOpen, setCommandPaletteOpen } = useUIStore()
+  const { commandPaletteOpen, setCommandPaletteOpen, toggleCommandPalette } = useUIStore()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
-        setCommandPaletteOpen(!commandPaletteOpen)
+        toggleCommandPalette()
       }
     }
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [commandPaletteOpen, setCommandPaletteOpen])
+  }, [toggleCommandPalette])
 
   const navigateTo = (href: string) => {
     setCommandPaletteOpen(false)

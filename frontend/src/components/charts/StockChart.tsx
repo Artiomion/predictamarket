@@ -109,7 +109,8 @@ export function StockChart() {
         chart.resize(width, width < 640 ? 300 : 400)
       }
     })
-    observer.observe(containerRef.current)
+    const container = containerRef.current
+    observer.observe(container)
 
     return () => {
       observer.disconnect()
