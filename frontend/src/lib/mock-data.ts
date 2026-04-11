@@ -237,6 +237,15 @@ export const mockAlerts: Alert[] = [
   { id: '2', ticker: 'NVDA', alert_type: 'price_below', condition_value: 180, is_active: true, is_triggered: false, created_at: '2026-04-09T10:00:00Z' },
 ];
 
+// ── Insider Transactions ─────────────────────────────
+export const mockInsiderTransactions = [
+  { insider_name: 'Tim Cook', title: 'CEO', transaction_type: 'sell' as const, shares: 75000, price: 258.50, total_value: 19387500, date: '2026-04-08', ticker: 'AAPL' },
+  { insider_name: 'Luca Maestri', title: 'CFO', transaction_type: 'sell' as const, shares: 30000, price: 255.20, total_value: 7656000, date: '2026-03-28', ticker: 'AAPL' },
+  { insider_name: 'Jeff Williams', title: 'COO', transaction_type: 'buy' as const, shares: 10000, price: 248.00, total_value: 2480000, date: '2026-03-20', ticker: 'AAPL' },
+  { insider_name: 'Deirdre O\'Brien', title: 'SVP Retail', transaction_type: 'sell' as const, shares: 15000, price: 252.80, total_value: 3792000, date: '2026-03-15', ticker: 'AAPL' },
+  { insider_name: 'Craig Federighi', title: 'SVP Engineering', transaction_type: 'buy' as const, shares: 5000, price: 250.00, total_value: 1250000, date: '2026-03-10', ticker: 'AAPL' },
+];
+
 // ── Landing Page Stats ────────────────────────────────
 export const mockLandingStats = {
   tickers_count: 94,

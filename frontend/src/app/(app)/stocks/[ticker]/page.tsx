@@ -3,13 +3,17 @@
 import { useState } from "react"
 import { useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Star, Lock } from "lucide-react"
+import { Star } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SignalBadge } from "@/components/ui/signal-badge"
 import { StockChart } from "@/components/charts/StockChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
+import { FinancialsTab } from "@/components/features/FinancialsTab"
+import { NewsTab } from "@/components/features/NewsTab"
+import { EarningsTab } from "@/components/features/EarningsTab"
+import { InsidersTab } from "@/components/features/InsidersTab"
 import { PriceChange } from "@/components/ui/price-change"
 import { mockInstruments, mockPrices, mockSignals } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
@@ -24,15 +28,6 @@ const tabs = [
 ] as const
 
 type TabId = (typeof tabs)[number]["id"]
-
-const tabPlaceholders: Record<TabId, { title: string; subtitle: string; locked?: boolean }> = {
-  chart: { title: "Chart", subtitle: "Coming in step 13b" },
-  forecast: { title: "Forecast", subtitle: "Coming in step 13c" },
-  financials: { title: "SEC EDGAR Data", subtitle: "Requires Pro plan", locked: true },
-  news: { title: "News", subtitle: "Coming in step 13d" },
-  earnings: { title: "Earnings", subtitle: "Coming in step 13d" },
-  insiders: { title: "Insider Transactions", subtitle: "Coming in step 13d" },
-}
 
 export default function StockPage() {
   const params = useParams()
@@ -63,8 +58,6 @@ export default function StockPage() {
       duration: 2000,
     })
   }
-
-  const placeholder = tabPlaceholders[activeTab]
 
   return (
     <div className="space-y-6">
@@ -148,21 +141,12 @@ export default function StockPage() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
         >
-          {activeTab === "chart" ? (
-            <StockChart />
-          ) : activeTab === "forecast" ? (
-            <ForecastTab ticker={ticker} />
-          ) : (
-            <div className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">
-              <div className="text-center">
-                {placeholder.locked && (
-                  <Lock className="mx-auto mb-3 size-5 text-text-muted" />
-                )}
-                <p className="text-sm text-text-muted">{placeholder.title}</p>
-                <p className="mt-1 text-xs text-text-muted">{placeholder.subtitle}</p>
-              </div>
-            </div>
-          )}
+          {activeTab === "chart" && <StockChart />}
+          {activeTab === "forecast" && <ForecastTab ticker={ticker} />}
+          {activeTab === "financials" && <FinancialsTab ticker={ticker} />}
+          {activeTab === "news" && <NewsTab ticker={ticker} />}
+          {activeTab === "earnings" && <EarningsTab ticker={ticker} />}
+          {activeTab === "insiders" && <InsidersTab ticker={ticker} />}
         </motion.div>
       </AnimatePresence>
     </div>
