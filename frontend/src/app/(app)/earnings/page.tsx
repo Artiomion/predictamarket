@@ -1,0 +1,108 @@
+"use client"
+
+import { useMemo } from "react"
+import Link from "next/link"
+import { motion } from "framer-motion"
+import { CalendarDays } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { mockUpcomingEarnings } from "@/lib/mock-data"
+import { cn } from "@/lib/utils"
+
+function getCountdown(dateStr: string): { label: string; variant: "danger" | "warning" | "secondary"; urgent: boolean } {
+  const diff = new Date(dateStr).getTime() - Date.now()
+  const days = Math.ceil(diff / 86400000)
+  if (days <= 0) return { label: "Today", variant: "danger", urgent: true }
+  if (days === 1) return { label: "Tomorrow", variant: "warning", urgent: false }
+  if (days <= 7) return { label: `In ${days} days`, variant: "secondary", urgent: false }
+  return {
+    label: new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    variant: "secondary",
+    urgent: false,
+  }
+}
+
+export default function EarningsPage() {
+  const sorted = useMemo(() => {
+    return [...mockUpcomingEarnings].sort(
+      (a, b) => new Date(a.report_date).getTime() - new Date(b.report_date).getTime()
+    )
+  }, [])
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <h1 className="font-heading text-2xl font-semibold">Earnings Calendar</h1>
+        <Badge variant="secondary" className="font-mono text-[10px]">
+          {sorted.length} upcoming
+        </Badge>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">
+          <div className="text-center">
+            <CalendarDays className="mx-auto size-8 text-text-muted" />
+            <p className="mt-3 text-sm text-text-muted">No upcoming earnings reports</p>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-card border border-border-subtle bg-bg-surface overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th className="px-5 py-3 text-left text-xs font-medium text-text-muted">Ticker</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-muted">Company</th>
+                <th className="hidden px-4 py-3 text-left text-xs font-medium text-text-muted sm:table-cell">Report Date</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-text-muted">EPS Est.</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-text-muted">Countdown</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((e, i) => {
+                const countdown = getCountdown(e.report_date)
+                const isNear = countdown.variant === "danger" || countdown.variant === "warning"
+
+                return (
+                  <motion.tr
+                    key={`${e.ticker}-${e.report_date}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.04, duration: 0.2, ease: "easeOut" }}
+                    className={cn(
+                      "border-b border-border-subtle last:border-b-0 transition-colors hover:bg-bg-elevated",
+                      countdown.urgent && "bg-bg-elevated",
+                      isNear && "border-l-2 border-l-warning"
+                    )}
+                  >
+                    <td className="px-5 py-3.5">
+                      <Link href={`/stocks/${e.ticker}`} className="font-mono text-xs font-medium hover:text-[var(--accent-from)]">
+                        {e.ticker}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3.5 text-text-secondary">{e.name}</td>
+                    <td className="hidden px-4 py-3.5 text-xs text-text-muted sm:table-cell">
+                      {new Date(e.report_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </td>
+                    <td className="px-4 py-3.5 text-right font-mono text-xs tabular-nums">
+                      ${e.eps_estimate.toFixed(2)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Badge
+                        variant={countdown.variant}
+                        className={cn(
+                          "font-mono text-[10px]",
+                          countdown.urgent && "animate-pulse"
+                        )}
+                      >
+                        {countdown.label}
+                      </Badge>
+                    </td>
+                  </motion.tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
