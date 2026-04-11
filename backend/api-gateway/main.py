@@ -42,6 +42,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(MetricsMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(JWTAuthMiddleware)
+# CORS must run before JWT to handle OPTIONS preflight without auth
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS.split(","),
@@ -49,11 +54,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-User-Id", "X-User-Tier", "X-Internal-Key", "X-Request-Id"],
 )
-
-app.add_middleware(MetricsMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(JWTAuthMiddleware)
 # Trust X-Forwarded-For from reverse proxy — must be outermost (added last = runs first)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
