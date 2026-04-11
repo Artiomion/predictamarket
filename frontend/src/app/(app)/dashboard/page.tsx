@@ -5,6 +5,9 @@ import { motion } from "framer-motion"
 import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuthStore } from "@/store/auth-store"
+import { TopPicks } from "@/components/features/TopPicks"
+import { LatestSignals } from "@/components/features/LatestSignals"
+import { MarketNews } from "@/components/features/MarketNews"
 
 const marketOverview = [
   { label: "S&P 500", value: 5842.01, change: 1.23 },
@@ -85,13 +88,14 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Placeholder for upcoming sections */}
-      <section className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">
-        <div className="text-center">
-          <p className="text-sm text-text-muted">Top Picks, Signals & News</p>
-          <p className="mt-1 text-xs text-text-muted">Coming in next steps</p>
-        </div>
-      </section>
+      {/* Top Picks + Signals */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        <TopPicks />
+        <LatestSignals />
+      </div>
+
+      {/* News */}
+      <MarketNews />
     </div>
   )
 }
