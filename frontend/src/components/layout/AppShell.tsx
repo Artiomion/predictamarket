@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { Sidebar } from "./Sidebar"
 import { Header } from "./Header"
 import { CommandPalette } from "./CommandPalette"
 import { useAuthStore } from "@/store/auth-store"
 import { useUIStore } from "@/store/ui-store"
+import { initSocket, onConnectionChange } from "@/lib/socket"
 import { cn } from "@/lib/utils"
 
 const pageTitles: Record<string, string> = {
@@ -18,13 +19,22 @@ const pageTitles: Record<string, string> = {
   "/watchlist": "Watchlist",
   "/news": "News",
   "/earnings": "Earnings",
+  "/notifications": "Notifications",
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [socketConnected, setSocketConnected] = useState(false)
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore()
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
   const pathname = usePathname()
+
+  // Init WebSocket
+  useEffect(() => {
+    initSocket(token)
+    return onConnectionChange(setSocketConnected)
+  }, [token])
 
   const title = pageTitles[pathname] || pathname.split("/").pop() || "PredictaMarket"
 
@@ -51,6 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           title={title}
           user={headerUser}
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
+          socketConnected={socketConnected}
         />
         <main className="p-4 md:p-6">
           {children}

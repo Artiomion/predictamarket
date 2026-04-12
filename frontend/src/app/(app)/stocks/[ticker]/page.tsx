@@ -7,7 +7,9 @@ import { RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { WatchlistButton } from "@/components/features/WatchlistButton"
+import { AlertButton } from "@/components/features/AlertButton"
 import { Skeleton } from "@/components/ui/skeleton"
+import { usePriceUpdate } from "@/lib/use-price-update"
 import { PriceChange } from "@/components/ui/price-change"
 import { StockChart } from "@/components/charts/StockChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
@@ -18,6 +20,23 @@ import { InsidersTab } from "@/components/features/InsidersTab"
 import { marketApi } from "@/lib/api"
 import type { Instrument, TickerPrice } from "@/types"
 import { cn } from "@/lib/utils"
+
+function LivePrice({ ticker, initialPrice, initialChangePct }: { ticker: string; initialPrice?: number; initialChangePct?: number }) {
+  const { price, changePct, flash } = usePriceUpdate(ticker, initialPrice, initialChangePct)
+  if (!price) return null
+  return (
+    <div className="text-right">
+      <p className={cn(
+        "font-mono text-2xl font-medium tabular-nums transition-colors duration-300",
+        flash === "up" && "text-success",
+        flash === "down" && "text-danger",
+      )}>
+        ${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      </p>
+      <PriceChange value={changePct} className="justify-end" />
+    </div>
+  )
+}
 
 const tabs = [
   { id: "chart", label: "Chart" },
@@ -117,14 +136,8 @@ export default function StockPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          {price && (
-            <div className="text-right">
-              <p className="font-mono text-2xl font-medium tabular-nums">
-                ${price.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </p>
-              <PriceChange value={price.change_pct} className="justify-end" />
-            </div>
-          )}
+          <LivePrice ticker={ticker} initialPrice={price?.price} initialChangePct={price?.change_pct} />
+          <AlertButton ticker={ticker} />
           <WatchlistButton ticker={ticker} />
         </div>
       </div>

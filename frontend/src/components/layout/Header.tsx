@@ -1,23 +1,36 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import Link from "next/link"
 import { Menu, Search, Bell, LogOut, Settings } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useUIStore } from "@/store/ui-store"
 import { useAuthStore } from "@/store/auth-store"
+import { notificationApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
   title: string
   user: { name: string; tier: string; avatar: string | null }
   onMobileMenuToggle: () => void
+  socketConnected?: boolean
 }
 
-export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
+export function Header({ title, user, onMobileMenuToggle, socketConnected = false }: HeaderProps) {
   const { setCommandPaletteOpen } = useUIStore()
   const logout = useAuthStore((s) => s.logout)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [alertCount, setAlertCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    notificationApi.getAlerts({ limit: 50 })
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : []
+        setAlertCount(list.filter((a) => a.is_active && !a.is_triggered).length)
+      })
+      .catch(() => {})
+  }, [])
 
   const tierColors: Record<string, string> = {
     free: "secondary",
@@ -46,7 +59,16 @@ export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
         <Menu className="size-5" />
       </button>
 
-      <h1 className="font-heading text-base font-medium">{title}</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="font-heading text-base font-medium">{title}</h1>
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            socketConnected ? "bg-success" : "bg-danger"
+          )}
+          title={socketConnected ? "Real-time connected" : "Real-time disconnected"}
+        />
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
         <button
@@ -57,12 +79,14 @@ export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
           <Search className="size-4" />
         </button>
 
-        <button className="relative rounded-button p-2 text-text-muted transition-colors duration-150 hover:bg-bg-surface hover:text-text-secondary">
+        <Link href="/notifications" className="relative rounded-button p-2 text-text-muted transition-colors duration-150 hover:bg-bg-surface hover:text-text-secondary">
           <Bell className="size-4" />
-          <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-danger text-[10px] font-medium text-bg-primary">
-            3
-          </span>
-        </button>
+          {alertCount > 0 && (
+            <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-danger text-[10px] font-medium text-bg-primary">
+              {alertCount > 9 ? "9+" : alertCount}
+            </span>
+          )}
+        </Link>
 
         {/* User avatar + dropdown */}
         <div className="relative" ref={dropdownRef}>

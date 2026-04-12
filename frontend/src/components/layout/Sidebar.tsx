@@ -11,6 +11,7 @@ import {
   Star,
   Newspaper,
   CalendarDays,
+  Bell,
   PanelLeftClose,
   PanelLeftOpen,
   X,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/watchlist", label: "Watchlist", icon: Star },
   { href: "/news", label: "News", icon: Newspaper },
   { href: "/earnings", label: "Earnings", icon: CalendarDays },
+  { href: "/notifications", label: "Alerts", icon: Bell },
 ] as const
 
 interface SidebarProps {
