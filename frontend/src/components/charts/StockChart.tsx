@@ -5,6 +5,7 @@ import { createChart, type IChartApi, type ISeriesApi, ColorType, CrosshairMode,
 import { cn } from "@/lib/utils"
 import { colors } from "@/lib/design-tokens"
 import { marketApi } from "@/lib/api"
+import { getSocket, subscribeTicker, unsubscribeTicker } from "@/lib/socket"
 import type { PriceBar } from "@/types"
 
 const timeframes = [
@@ -153,6 +154,44 @@ export function StockChart({ ticker = "AAPL" }: StockChartProps) {
       })
       .finally(() => setLoading(false))
   }, [ticker, activeTimeframe])
+
+  // Real-time price updates via WebSocket → update last candle
+  useEffect(() => {
+    if (!ticker) return
+
+    subscribeTicker(ticker)
+    const socket = getSocket()
+    if (!socket) return
+
+    const handler = (data: { ticker: string; price: number }) => {
+      if (data.ticker !== ticker || !candleRef.current || !volumeRef.current) return
+
+      const last = history[history.length - 1]
+      if (!last) return
+
+      const updatedCandle = {
+        time: last.date,
+        open: last.open,
+        high: Math.max(last.high, data.price),
+        low: Math.min(last.low, data.price),
+        close: data.price,
+      }
+
+      candleRef.current.update(updatedCandle)
+      volumeRef.current.update({
+        time: last.date,
+        value: last.volume,
+        color: data.price >= last.open ? "rgba(0,255,136,0.3)" : "rgba(255,51,102,0.3)",
+      })
+    }
+
+    socket.on("price:update", handler)
+
+    return () => {
+      socket.off("price:update", handler)
+      unsubscribeTicker(ticker)
+    }
+  }, [ticker, history])
 
   return (
     <div className="space-y-3">
