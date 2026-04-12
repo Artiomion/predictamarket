@@ -14,8 +14,9 @@ SERVICE_MAP: dict[str, str] = {
     "/api/insider":   settings.MARKET_SERVICE_URL,
     "/api/news":      settings.NEWS_SERVICE_URL,
     "/api/forecast":  settings.FORECAST_SERVICE_URL,
-    "/api/portfolio": settings.PORTFOLIO_SERVICE_URL,
-    "/api/edgar":     settings.EDGAR_SERVICE_URL,
+    "/api/portfolio":      settings.PORTFOLIO_SERVICE_URL,
+    "/api/notifications":  settings.NOTIFICATION_SERVICE_URL,
+    "/api/edgar":          settings.EDGAR_SERVICE_URL,
 }
 
 
