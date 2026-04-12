@@ -40,7 +40,7 @@ export default function LoginPage() {
       const { data: user } = await authApi.getMe()
       setUser(user)
 
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     } catch (err: unknown) {
       const error = err as { response?: { status?: number } }
       if (error.response?.status === 401) {

@@ -44,6 +44,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         request.state.user_id = None
         request.state.user_tier = None
 
+        # CORS preflight — let CORSMiddleware handle it
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if _is_public(request.url.path, request.method):
             # Still decode token if present (for tier-aware responses on public routes)
             self._try_decode(request)

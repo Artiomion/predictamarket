@@ -44,7 +44,7 @@ export default function RegisterPage() {
       const { data: user } = await authApi.getMe()
       setUser(user)
 
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     } catch (err: unknown) {
       const error = err as { response?: { status?: number; data?: { detail?: string } } }
       if (error.response?.status === 400) {

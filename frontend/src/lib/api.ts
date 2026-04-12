@@ -123,8 +123,8 @@ api.interceptors.response.use(
       toast.error("Something went wrong. Please try again.")
     }
 
-    // Network error
-    if (!error.response) {
+    // Network error (skip cancelled requests from navigation)
+    if (!error.response && error.code !== "ERR_CANCELED") {
       toast.error("Connection lost. Check your internet.")
     }
 
