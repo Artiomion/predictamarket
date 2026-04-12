@@ -45,7 +45,8 @@ with DAG(
     run_forecast = BashOperator(
         task_id="run_batch_forecast",
         bash_command=f'curl -sf -X POST {FORECAST_URL}/admin/run-batch {CURL_AUTH}',
-        execution_timeout=timedelta(minutes=60),
+        execution_timeout=timedelta(minutes=90),
+        pool="forecast_pool",
     )
 
     update_financials >> update_earnings >> run_forecast

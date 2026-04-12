@@ -49,7 +49,8 @@ with DAG(
             'curl -sf -X POST http://forecast-service:8004/api/forecast/admin/run-batch '
             '-H "x-internal-key: $INTERNAL_API_KEY"'
         ),
-        execution_timeout=timedelta(minutes=60),
+        execution_timeout=timedelta(minutes=90),
+        pool="forecast_pool",
     )
 
     [wait_prices, wait_news] >> run_forecast

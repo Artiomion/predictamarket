@@ -1,7 +1,5 @@
 """Admin endpoints for triggering data updates (Airflow DAGs)."""
 
-import asyncio
-
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends
 

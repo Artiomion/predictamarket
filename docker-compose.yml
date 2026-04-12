@@ -315,12 +315,13 @@ services:
       context: .
       dockerfile: docker/airflow/Dockerfile
     container_name: predictamarket-airflow-init
-    entrypoint: ["bash", "-c", "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@predictamarket.com || true"]
+    entrypoint: ["bash", "-c", "airflow db migrate && airflow users create --username admin --password ${AIRFLOW_ADMIN_PASSWORD} --firstname Admin --lastname Admin --role Admin --email admin@predictamarket.com || true && airflow pools set forecast_pool 1 'TFT inference - max 1 concurrent' || true"]
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: "zTvhDiKWKP9g0fiDB4GYbPCOHPsuzumD_hm7KJlfzXA="
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -336,9 +337,10 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: "zTvhDiKWKP9g0fiDB4GYbPCOHPsuzumD_hm7KJlfzXA="
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW_WEBSERVER_SECRET_KEY}"
     env_file: .env
     volumes:
       - ./airflow/dags:/opt/airflow/dags
@@ -372,7 +374,7 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
-      AIRFLOW__CORE__FERNET_KEY: "zTvhDiKWKP9g0fiDB4GYbPCOHPsuzumD_hm7KJlfzXA="
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     env_file: .env
     volumes:
