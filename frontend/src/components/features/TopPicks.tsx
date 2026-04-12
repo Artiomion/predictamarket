@@ -15,13 +15,14 @@ import type { TopPick } from "@/types"
 export function TopPicks() {
   const [picks, setPicks] = useState<TopPick[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const tier = useAuthStore((s) => s.user?.tier ?? "free")
 
   useEffect(() => {
     const limit = tier === "free" ? 5 : 20
     forecastApi.getTopPicks({ limit })
-      .then(({ data }) => setPicks(data))
-      .catch(() => setPicks([]))
+      .then(({ data }) => { setPicks(data); setError(false) })
+      .catch(() => { setPicks([]); setError(true) })
       .finally(() => setLoading(false))
   }, [tier])
 
@@ -68,6 +69,12 @@ export function TopPicks() {
                   <td className="px-5 py-3"><Skeleton className="h-4 w-14 ml-auto" /></td>
                 </tr>
               ))
+            ) : error ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-8 text-center text-sm text-danger">
+                  Failed to load top picks
+                </td>
+              </tr>
             ) : picks.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-5 py-8 text-center text-sm text-text-muted">

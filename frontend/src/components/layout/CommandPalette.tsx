@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Command } from "cmdk"
 import { motion, AnimatePresence } from "framer-motion"
@@ -12,19 +12,8 @@ import {
   Search,
 } from "lucide-react"
 import { useUIStore } from "@/store/ui-store"
-
-const mockTickers = [
-  { ticker: "AAPL", name: "Apple Inc." },
-  { ticker: "MSFT", name: "Microsoft Corporation" },
-  { ticker: "GOOGL", name: "Alphabet Inc." },
-  { ticker: "AMZN", name: "Amazon.com Inc." },
-  { ticker: "NVDA", name: "NVIDIA Corporation" },
-  { ticker: "TSLA", name: "Tesla Inc." },
-  { ticker: "META", name: "Meta Platforms Inc." },
-  { ticker: "JPM", name: "JPMorgan Chase & Co." },
-  { ticker: "V", name: "Visa Inc." },
-  { ticker: "JNJ", name: "Johnson & Johnson" },
-] as const
+import { marketApi } from "@/lib/api"
+import type { Instrument } from "@/types"
 
 const pages = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,7 +23,14 @@ const pages = [
 
 export function CommandPalette() {
   const router = useRouter()
+  const [tickers, setTickers] = useState<Instrument[]>([])
   const { commandPaletteOpen, setCommandPaletteOpen, toggleCommandPalette } = useUIStore()
+
+  useEffect(() => {
+    marketApi.getInstruments({ per_page: 100 })
+      .then(({ data }) => setTickers(data.data || []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -96,7 +92,7 @@ export function CommandPalette() {
                     heading="Stocks"
                     className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted"
                   >
-                    {mockTickers.map((t) => (
+                    {tickers.map((t) => (
                       <Command.Item
                         key={t.ticker}
                         value={`${t.ticker} ${t.name}`}

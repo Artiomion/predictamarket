@@ -13,13 +13,15 @@ import type { NewsArticle } from "@/types"
 export function MarketNews() {
   const [articles, setArticles] = useState<NewsArticle[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     newsApi.getNews({ per_page: 3 })
       .then(({ data }) => {
         setArticles((data.data || []).map(normalizeNewsArticle))
+        setError(false)
       })
-      .catch(() => setArticles([]))
+      .catch(() => { setArticles([]); setError(true) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -40,6 +42,8 @@ export function MarketNews() {
               <Skeleton className="mt-2 h-3 w-32" />
             </div>
           ))
+        ) : error ? (
+          <p className="px-2 py-4 text-center text-xs text-danger">Failed to load news</p>
         ) : articles.length === 0 ? (
           <p className="px-2 py-4 text-center text-xs text-text-muted">No news available</p>
         ) : (

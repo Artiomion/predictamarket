@@ -69,7 +69,9 @@ export function initSocket(token?: string | null) {
   })
 
   socket.on("error", (data: { detail: string }) => {
-    console.warn("Socket error:", data.detail)
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Socket error:", data.detail)
+    }
   })
 
   return socket

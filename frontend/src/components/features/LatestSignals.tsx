@@ -19,14 +19,16 @@ interface SignalItem {
 export function LatestSignals() {
   const [signals, setSignals] = useState<SignalItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     forecastApi.getSignals()
       .then(({ data }) => {
         const items = (Array.isArray(data) ? data : []).slice(0, 5)
         setSignals(items)
+        setError(false)
       })
-      .catch(() => setSignals([]))
+      .catch(() => { setSignals([]); setError(true) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -47,6 +49,8 @@ export function LatestSignals() {
               <Skeleton className="h-4 w-14" />
             </div>
           ))
+        ) : error ? (
+          <p className="px-2 py-4 text-center text-xs text-danger">Failed to load signals</p>
         ) : signals.length === 0 ? (
           <p className="px-2 py-4 text-center text-xs text-text-muted">No signals available</p>
         ) : (
