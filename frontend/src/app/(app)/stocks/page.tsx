@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { FilterChip } from "@/components/ui/filter-chip"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PriceChange } from "@/components/ui/price-change"
 import { formatMarketCap } from "@/lib/formatters"
 import { marketApi } from "@/lib/api"
-import type { Instrument } from "@/types"
+import type { Instrument, TickerPrice } from "@/types"
 import { cn } from "@/lib/utils"
 
 type SortField = "ticker" | "name" | "market_cap" | "sector"
@@ -34,6 +35,7 @@ const SECTORS = [
 export default function StocksPage() {
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [total, setTotal] = useState(0)
+  const [prices, setPrices] = useState<Record<string, TickerPrice>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -65,6 +67,24 @@ export default function StocksPage() {
     const debounce = setTimeout(fetchInstruments, search ? 300 : 0)
     return () => clearTimeout(debounce)
   }, [fetchInstruments, search])
+
+  // Fetch prices for visible instruments
+  useEffect(() => {
+    if (instruments.length === 0) return
+    const fetchPrices = async () => {
+      const priceMap: Record<string, TickerPrice> = {}
+      await Promise.all(
+        instruments.map(async (i) => {
+          try {
+            const { data } = await marketApi.getPrice(i.ticker)
+            priceMap[i.ticker] = data
+          } catch { /* skip */ }
+        })
+      )
+      setPrices(priceMap)
+    }
+    fetchPrices()
+  }, [instruments])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -187,10 +207,14 @@ export default function StocksPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="font-mono text-xs tabular-nums text-text-muted">—</span>
+                        <Link href={`/stocks/${instrument.ticker}`} className="block font-mono text-xs tabular-nums">
+                          {prices[instrument.ticker] ? `$${prices[instrument.ticker].price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-xs text-text-muted">—</span>
+                        <Link href={`/stocks/${instrument.ticker}`} className="block">
+                          {prices[instrument.ticker] ? <PriceChange value={prices[instrument.ticker].change_pct} /> : <span className="text-xs text-text-muted">—</span>}
+                        </Link>
                       </td>
                       <td className="hidden px-4 py-3 text-text-secondary md:table-cell">
                         <Link href={`/stocks/${instrument.ticker}`} className="block text-xs">
