@@ -274,6 +274,10 @@ export const portfolioApi = {
 export const newsApi = {
   getNews: (params?: { ticker?: string; source?: string; sentiment?: string; impact?: string; page?: number; per_page?: number }) =>
     api.get<PaginatedResponse<NewsArticle>>("/api/news/news", { params }),
+  getNewsByTicker: (ticker: string, params?: { page?: number; per_page?: number }) =>
+    api.get<PaginatedResponse<NewsArticle>>(`/api/news/news/${ticker}`, { params }),
+  getTickerSentiment: (ticker: string, params?: { days?: number }) =>
+    api.get(`/api/news/news/${ticker}/sentiment`, { params }),
   getFeed: () =>
     api.get<PaginatedResponse<NewsArticle>>("/api/news/feed"),
 }

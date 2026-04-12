@@ -189,6 +189,9 @@ export interface NewsArticle {
   sentiment_score: number;
   impact: Impact;
   summary: string;
+  // API may return these alternate field names
+  sentiment_label?: Sentiment;
+  impact_level?: Impact;
 }
 
 // ── Earnings ──────────────────────────────────────────

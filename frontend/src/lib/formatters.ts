@@ -45,3 +45,12 @@ export function formatPrice(price: number): string {
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat(LOCALE).format(n)
 }
+
+// Normalize API response field names (sentiment_label → sentiment, impact_level → impact)
+export function normalizeNewsArticle<T extends { sentiment_label?: string; impact_level?: string; sentiment?: string; impact?: string }>(article: T): T {
+  return {
+    ...article,
+    sentiment: article.sentiment || article.sentiment_label || "neutral",
+    impact: article.impact || article.impact_level || "medium",
+  }
+}
