@@ -226,6 +226,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
       - REDIS_URL=redis://redis:6379/0
+      - MARKET_SERVICE_URL=http://market-data-service:8002
       - DEBUG=false
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8005/health || exit 1"]

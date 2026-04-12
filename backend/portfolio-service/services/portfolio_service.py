@@ -169,12 +169,16 @@ async def add_position(
 async def get_positions(
     session: AsyncSession, portfolio_id: uuid.UUID, user_id: uuid.UUID,
 ) -> list[PortfolioItem]:
+    from services.price_helper import enrich_positions_with_prices
+
     await _get_portfolio_owned(session, portfolio_id, user_id)
     result = await session.execute(
         select(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id)
         .order_by(PortfolioItem.ticker)
     )
-    return list(result.scalars().all())
+    positions = list(result.scalars().all())
+    await enrich_positions_with_prices(positions)
+    return positions
 
 
 async def delete_position(
@@ -226,15 +230,19 @@ async def delete_position(
 async def get_analytics(
     session: AsyncSession, portfolio_id: uuid.UUID, user_id: uuid.UUID,
 ) -> dict:
+    from services.price_helper import enrich_positions_with_prices
+
     await _get_portfolio_owned(session, portfolio_id, user_id)
 
     items = await session.execute(
         select(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id)
     )
-    positions = items.scalars().all()
+    positions = list(items.scalars().all())
     if not positions:
         return {"total_value": 0, "total_pnl": 0, "total_pnl_pct": 0,
                 "positions_count": 0, "best_position": None, "worst_position": None}
+
+    await enrich_positions_with_prices(positions)
 
     total_value = sum(p.quantity * (p.current_price or p.avg_buy_price) for p in positions)
     total_cost = sum(p.quantity * p.avg_buy_price for p in positions)
