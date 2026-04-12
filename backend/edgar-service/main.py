@@ -19,6 +19,7 @@ init_sentry()
 
 from routers.health import router as health_router  # noqa: E402
 from routers.edgar import router as edgar_router  # noqa: E402
+from routers.admin import router as admin_router  # noqa: E402
 
 logger = structlog.get_logger()
 
@@ -34,3 +35,4 @@ app = FastAPI(title="PredictaMarket EDGAR Service", version="0.1.0", lifespan=li
 
 app.include_router(health_router)
 app.include_router(edgar_router, prefix="/api/edgar", tags=["edgar"])
+app.include_router(admin_router, prefix="/api/edgar", tags=["admin"])

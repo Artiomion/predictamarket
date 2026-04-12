@@ -18,6 +18,7 @@ from routers.health import router as health_router  # noqa: E402
 from routers.instruments import router as instruments_router  # noqa: E402
 from routers.earnings import router as earnings_router  # noqa: E402
 from routers.insider import router as insider_router  # noqa: E402
+from routers.admin import router as admin_router  # noqa: E402
 
 logger = structlog.get_logger()
 
@@ -39,3 +40,4 @@ app.include_router(health_router)
 app.include_router(instruments_router, prefix="/api/market", tags=["market"])
 app.include_router(earnings_router, prefix="/api/earnings", tags=["earnings"])
 app.include_router(insider_router, prefix="/api/insider", tags=["insider"])
+app.include_router(admin_router, prefix="/api/market", tags=["admin"])

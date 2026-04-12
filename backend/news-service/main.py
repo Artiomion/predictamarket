@@ -19,6 +19,7 @@ init_sentry()
 
 from routers.health import router as health_router  # noqa: E402
 from routers.news import router as news_router  # noqa: E402
+from routers.admin import router as admin_router  # noqa: E402
 
 logger = structlog.get_logger()
 
@@ -38,3 +39,4 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(news_router, prefix="/api/news", tags=["news"])
+app.include_router(admin_router, prefix="/api/news", tags=["admin"])

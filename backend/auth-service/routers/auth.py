@@ -1,7 +1,7 @@
 import uuid
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import require_user_id
@@ -34,12 +34,7 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-def _require_internal_key(x_internal_key: str | None = Header(None)) -> str:
-    """Verify internal service-to-service API key (constant-time comparison)."""
-    import hmac
-    if not x_internal_key or not hmac.compare_digest(x_internal_key, settings.INTERNAL_API_KEY):
-        raise HTTPException(status_code=403, detail="Forbidden: internal endpoint")
-    return x_internal_key
+from shared.internal_auth import require_internal_key as _require_internal_key
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)

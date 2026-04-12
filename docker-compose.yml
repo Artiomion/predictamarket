@@ -339,13 +339,9 @@ services:
       AIRFLOW__CORE__FERNET_KEY: "zTvhDiKWKP9g0fiDB4GYbPCOHPsuzumD_hm7KJlfzXA="
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
-      REDIS_URL: redis://redis:6379/0
     env_file: .env
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./backend:/opt/airflow/backend:ro
-      - ./models:/opt/airflow/models:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -378,13 +374,9 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: "zTvhDiKWKP9g0fiDB4GYbPCOHPsuzumD_hm7KJlfzXA="
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
-      REDIS_URL: redis://redis:6379/0
     env_file: .env
     volumes:
       - ./airflow/dags:/opt/airflow/dags
-      - ./backend:/opt/airflow/backend:ro
-      - ./models:/opt/airflow/models:ro
     restart: unless-stopped
     deploy:
       resources:
