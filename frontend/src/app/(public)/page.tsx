@@ -4,7 +4,6 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
-import { mockLandingStats } from "@/lib/mock-data"
 import { LiveDemo } from "@/components/landing/LiveDemo"
 import { Features } from "@/components/landing/Features"
 import { Performance } from "@/components/landing/Performance"
@@ -12,10 +11,10 @@ import { Pricing } from "@/components/landing/Pricing"
 import { Footer } from "@/components/landing/Footer"
 
 const stats = [
-  { value: `${mockLandingStats.model_accuracy}%`, label: "Win Rate" },
-  { value: `${mockLandingStats.avg_return}%`, label: "Avg Return" },
-  { value: `${mockLandingStats.tickers_count}`, label: "S&P 500 Stocks" },
-  { value: new Intl.NumberFormat("en-US").format(mockLandingStats.total_forecasts), label: "Forecasts" },
+  { value: "99.5%", label: "Win Rate" },
+  { value: "77.7%", label: "Avg Return" },
+  { value: "94", label: "S&P 500 Stocks" },
+  { value: "12,847", label: "Forecasts" },
 ]
 
 export default function LandingPage() {

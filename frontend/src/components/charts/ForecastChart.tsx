@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createChart, type IChartApi, ColorType, CrosshairMode, CandlestickSeries, LineSeries, AreaSeries, LineStyle } from "lightweight-charts"
 import { colors } from "@/lib/design-tokens"
-import { mockPriceHistory } from "@/lib/mock-data"
-import type { Forecast } from "@/types"
+import { marketApi } from "@/lib/api"
+import type { Forecast, PriceBar } from "@/types"
 
 interface ForecastChartProps {
   forecast: Forecast
@@ -24,9 +24,16 @@ function addTradingDays(dateStr: string, days: number): string {
 export function ForecastChart({ forecast }: ForecastChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
+  const [history, setHistory] = useState<PriceBar[]>([])
 
   useEffect(() => {
-    if (!containerRef.current) return
+    marketApi.getHistory(forecast.ticker, { period: "3m" })
+      .then(({ data }) => setHistory(data))
+      .catch(() => {})
+  }, [forecast.ticker])
+
+  useEffect(() => {
+    if (!containerRef.current || history.length === 0) return
 
     const chart = createChart(containerRef.current, {
       layout: {
@@ -44,17 +51,11 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
         vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
         horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: colors.bg.surface },
       },
-      rightPriceScale: {
-        borderColor: colors.border.subtle,
-      },
-      timeScale: {
-        borderColor: colors.border.subtle,
-        timeVisible: false,
-      },
+      rightPriceScale: { borderColor: colors.border.subtle },
+      timeScale: { borderColor: colors.border.subtle, timeVisible: false },
       handleScroll: { vertTouchDrag: false },
     })
 
-    // Candlestick series (historical data)
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: colors.success,
       downColor: colors.danger,
@@ -64,17 +65,10 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
     })
 
     candleSeries.setData(
-      mockPriceHistory.map((d) => ({
-        time: d.date,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }))
+      history.map((d) => ({ time: d.date, open: d.open, high: d.high, low: d.low, close: d.close }))
     )
 
-    // Forecast line (dashed, starts from last candle)
-    const lastDate = mockPriceHistory[mockPriceHistory.length - 1].date
+    const lastDate = history[history.length - 1].date
     const forecastLine = chart.addSeries(LineSeries, {
       color: colors.accent.from,
       lineWidth: 2,
@@ -90,7 +84,6 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
       ...forecast.full_curve.map((v, i) => ({ time: forecastDates[i], value: v })),
     ])
 
-    // 80% CI band
     const ci80 = chart.addSeries(AreaSeries, {
       lineWidth: 1,
       topColor: "rgba(0,212,170,0.08)",
@@ -101,37 +94,40 @@ export function ForecastChart({ forecast }: ForecastChartProps) {
       lastValueVisible: false,
     })
 
-    // Simple CI approximation: interpolate between forecast points
     const ciData80 = forecastDates.map((date, i) => {
       const progress = i / (forecast.full_curve.length - 1)
-      const lower = forecast.forecast["1d"].lower_80 + (forecast.forecast["1m"].lower_80 - forecast.forecast["1d"].lower_80) * progress
       const upper = forecast.forecast["1d"].upper_80 + (forecast.forecast["1m"].upper_80 - forecast.forecast["1d"].upper_80) * progress
-      return { time: date, value: upper, lower }
+      return { time: date, value: upper }
     })
-
-    ci80.setData(ciData80.map((d) => ({ time: d.time, value: d.value })))
+    ci80.setData(ciData80)
 
     chart.timeScale().fitContent()
     chartRef.current = chart
 
+    const container = containerRef.current
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width } = entry.contentRect
         chart.resize(width, width < 640 ? 280 : 360)
       }
     })
-    const container = containerRef.current
     if (container) observer.observe(container)
 
     return () => {
       observer.disconnect()
       chart.remove()
     }
-  }, [forecast])
+  }, [forecast, history])
 
   return (
     <div className="rounded-card border border-border-subtle overflow-hidden">
-      <div ref={containerRef} className="h-[360px] w-full max-sm:h-[280px]" />
+      {history.length === 0 ? (
+        <div className="flex h-[360px] items-center justify-center">
+          <p className="text-sm text-text-muted">Loading chart...</p>
+        </div>
+      ) : (
+        <div ref={containerRef} className="h-[360px] w-full max-sm:h-[280px]" />
+      )}
     </div>
   )
 }
