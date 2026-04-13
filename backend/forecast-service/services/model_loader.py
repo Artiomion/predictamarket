@@ -109,11 +109,16 @@ class ModelArtifacts:
             with open(models_dir / "pca_model.pkl", "rb") as f:
                 self.pca = pickle.load(f)
 
-            # 6. FinBERT (for live news sentiment)
-            from transformers import AutoModel, AutoTokenizer
-            self.finbert_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
-            self.finbert_model = AutoModel.from_pretrained("ProsusAI/finbert")
-            self.finbert_model.eval()
+            # 6. FinBERT (for live news sentiment — optional, may not be cached)
+            try:
+                from transformers import AutoModel, AutoTokenizer
+                self.finbert_tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
+                self.finbert_model = AutoModel.from_pretrained("ProsusAI/finbert")
+                self.finbert_model.eval()
+            except Exception:
+                structlog.get_logger().warning("finbert_not_available", reason="model not cached, sentiment from DB only")
+                self.finbert_tokenizer = None
+                self.finbert_model = None
 
             self._loaded = True
             structlog.get_logger().info("models_loaded", tft_ckpt=ckpts[-1], valid_tickers=len(self.valid_tickers))

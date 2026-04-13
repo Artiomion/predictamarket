@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth-store"
 import { TopPicks } from "@/components/features/TopPicks"
 import { LatestSignals } from "@/components/features/LatestSignals"
 import { MarketNews } from "@/components/features/MarketNews"
+import { MarketStatusBanner } from "@/components/ui/market-status"
 import { marketApi } from "@/lib/api"
 
 const MARKET_TICKERS = [
@@ -89,6 +90,8 @@ export default function DashboardPage() {
           {getGreeting()}, {user?.full_name?.split(" ")[0] || "there"}
         </p>
       </div>
+
+      <MarketStatusBanner />
 
       <section>
         <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-text-muted">

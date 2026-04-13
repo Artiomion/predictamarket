@@ -8,6 +8,7 @@ import { useUIStore } from "@/store/ui-store"
 import { useAuthStore } from "@/store/auth-store"
 import { notificationApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { MarketStatusBadge } from "@/components/ui/market-status"
 
 interface HeaderProps {
   title: string
@@ -59,15 +60,11 @@ export function Header({ title, user, onMobileMenuToggle, socketConnected = fals
         <Menu className="size-5" />
       </button>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <h1 className="font-heading text-base font-medium">{title}</h1>
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            socketConnected ? "bg-success" : "bg-danger"
-          )}
-          title={socketConnected ? "Real-time connected" : "Real-time disconnected"}
-        />
+        <div className="hidden sm:block">
+          <MarketStatusBadge />
+        </div>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
@@ -116,13 +113,14 @@ export function Header({ title, user, onMobileMenuToggle, socketConnected = fals
                 <p className="text-sm font-medium">{user.name}</p>
                 <p className="text-xs text-text-muted">{user.tier} plan</p>
               </div>
-              <button
-                onClick={() => { setDropdownOpen(false) }}
+              <a
+                href="/settings"
+                onClick={() => setDropdownOpen(false)}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-elevated"
               >
                 <Settings className="size-3.5" />
                 Settings
-              </button>
+              </a>
               <button
                 onClick={() => { setDropdownOpen(false); logout() }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger transition-colors hover:bg-bg-elevated"

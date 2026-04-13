@@ -19,6 +19,8 @@ CREATE TABLE auth.users (
                 CHECK (tier IN ('free', 'pro', 'premium')),
     is_active   BOOLEAN NOT NULL DEFAULT TRUE,
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    stripe_customer_id VARCHAR(255),
+    stripe_subscription_id VARCHAR(255),
     last_login  TIMESTAMPTZ,
     deleted_at  TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),

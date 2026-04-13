@@ -3,7 +3,7 @@
 from shared.utils import UNLIMITED
 
 # API Gateway rate limiting (requests per minute)
-GATEWAY_RATE_LIMITS = {"free": 60, "pro": 300, "premium": 1000}
+GATEWAY_RATE_LIMITS = {"free": 500, "pro": 1500, "premium": 5000}
 
 # Forecast daily limits
 FORECAST_DAILY_LIMITS = {"free": 1, "pro": 10, "premium": UNLIMITED}

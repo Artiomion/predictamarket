@@ -19,6 +19,8 @@ class User(SoftDeleteMixin, BaseModel):
     tier: Mapped[str] = mapped_column(String(20), nullable=False, default="free", index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255))
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), index=True)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")

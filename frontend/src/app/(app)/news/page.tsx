@@ -28,29 +28,42 @@ const impactFilters: { id: Impact | "all"; label: string }[] = [
   { id: "low", label: "Low" },
 ]
 
+const PER_PAGE = 20
+
 export default function NewsPage() {
   const [articles, setArticles] = useState<NewsArticle[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [sentiment, setSentiment] = useState<Sentiment | "all">("all")
   const [impact, setImpact] = useState<Impact | "all">("all")
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  useEffect(() => {
-    setLoading(true)
+  const fetchNews = (pageNum: number, append: boolean) => {
+    const setLoad = append ? setLoadingMore : setLoading
+    setLoad(true)
     newsApi.getNews({
       sentiment: sentiment !== "all" ? sentiment : undefined,
       impact: impact !== "all" ? impact : undefined,
-      per_page: 20,
+      per_page: PER_PAGE,
+      page: pageNum,
     })
       .then(({ data }) => {
         const items = (data.data || []).map(normalizeNewsArticle)
-        setArticles(items)
+        setArticles((prev) => append ? [...prev, ...items] : items)
         setTotal(data.total || items.length)
+        setPage(pageNum)
       })
-      .catch(() => setArticles([]))
-      .finally(() => setLoading(false))
-  }, [sentiment, impact])
+      .catch(() => { if (!append) setArticles([]) })
+      .finally(() => setLoad(false))
+  }
+
+  useEffect(() => {
+    fetchNews(1, false)
+  }, [sentiment, impact]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasMore = articles.length < total
 
   return (
     <div className="space-y-6">
@@ -136,6 +149,24 @@ export default function NewsPage() {
               ))
             )}
           </AnimatePresence>
+        )}
+
+        {!loading && hasMore && (
+          <div className="flex items-center justify-center pt-2">
+            <button
+              onClick={() => fetchNews(page + 1, true)}
+              disabled={loadingMore}
+              className="rounded-button border border-border-subtle bg-bg-surface px-6 py-2.5 text-sm text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : `Load more (${articles.length} of ${total})`}
+            </button>
+          </div>
+        )}
+
+        {!loading && !hasMore && articles.length > 0 && (
+          <p className="pt-2 text-center text-xs text-text-muted">
+            All {total} articles loaded
+          </p>
         )}
       </div>
     </div>

@@ -17,7 +17,7 @@ export function WaterfallChart({ factors }: WaterfallChartProps) {
 
       <div className="mt-4 space-y-2.5">
         {factors.map((factor, i) => {
-          const pct = (factor.weight / maxWeight) * 100
+          const pct = Math.max((factor.weight / maxWeight) * 100, 8)
           const isBullish = factor.direction === "bullish"
 
           return (
@@ -52,7 +52,7 @@ export function WaterfallChart({ factors }: WaterfallChartProps) {
                       initial={{ width: 0 }}
                       animate={{ width: `${pct}%` }}
                       transition={{ delay: i * 0.1 + 0.2, duration: 0.4, ease: "easeOut" }}
-                      className="h-5 rounded-sm bg-danger/60"
+                      className="h-5 rounded-sm bg-danger"
                     />
                   )}
                 </div>
@@ -65,7 +65,7 @@ export function WaterfallChart({ factors }: WaterfallChartProps) {
                       initial={{ width: 0 }}
                       animate={{ width: `${pct}%` }}
                       transition={{ delay: i * 0.1 + 0.2, duration: 0.4, ease: "easeOut" }}
-                      className="h-5 rounded-sm bg-success/60"
+                      className="h-5 rounded-sm bg-success"
                     />
                   )}
                 </div>

@@ -71,8 +71,15 @@ export default function StockPage() {
         ])
         setInstrument(instrRes.data)
         if (priceRes) setPrice(priceRes.data)
-      } catch {
-        setError("Ticker not found")
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } }).response?.status
+        if (status === 429) {
+          setError("Rate limit exceeded. Please wait a moment and try again.")
+        } else if (status === 404) {
+          setError("Ticker not found")
+        } else {
+          setError("Failed to load ticker data")
+        }
       } finally {
         setLoading(false)
       }
@@ -104,9 +111,9 @@ export default function StockPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <h2 className="font-heading text-2xl font-semibold">Ticker not found</h2>
+          <h2 className="font-heading text-2xl font-semibold">{error || "Ticker not found"}</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            &quot;{ticker}&quot; is not in the S&P 500 prediction set
+            {error?.includes("Rate limit") ? "You're browsing too fast" : `"${ticker}" is not in the S&P 500 prediction set`}
           </p>
           <Button variant="outline" size="sm" className="mt-4 gap-1.5" onClick={() => window.location.reload()}>
             <RefreshCw className="size-3.5" /> Retry

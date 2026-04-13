@@ -22,6 +22,7 @@ from middleware.rate_limit import RateLimitMiddleware  # noqa: E402
 from middleware.logging import RequestLoggingMiddleware  # noqa: E402
 from routers.proxy import router as proxy_router  # noqa: E402
 from routers.health import router as health_router  # noqa: E402
+from routers.billing import router as billing_router  # noqa: E402
 from services.proxy_client import proxy_client  # noqa: E402
 
 logger = structlog.get_logger()
@@ -59,4 +60,5 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 app.include_router(health_router)
 app.include_router(metrics_router)
+app.include_router(billing_router, prefix="/api/billing", tags=["billing"])
 app.include_router(proxy_router)
