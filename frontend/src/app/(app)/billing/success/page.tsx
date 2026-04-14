@@ -6,12 +6,23 @@ import { CheckCircle2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuthStore } from "@/store/auth-store"
 import { authApi } from "@/lib/api"
+import api from "@/lib/api"
 
 export default function BillingSuccessPage() {
-  const { setUser } = useAuthStore()
+  const { setUser, setAuth } = useAuthStore()
   const confettiDone = useRef(false)
 
   useEffect(() => {
+    // Force token refresh to get JWT with updated tier
+    const refreshToken = localStorage.getItem("pm_refresh_token")
+    if (refreshToken) {
+      api.post("/api/auth/refresh", { refresh_token: refreshToken })
+        .then(({ data }) => {
+          setAuth(data.access_token, data.refresh_token)
+        })
+        .catch(() => {})
+    }
+
     // Refresh user data to get new tier
     authApi.getMe()
       .then(({ data }) => setUser(data))
