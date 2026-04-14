@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useAuthStore } from "@/store/auth-store"
-import { authApi } from "@/lib/api"
+import { authApi, billingApi } from "@/lib/api"
 import { toast } from "sonner"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -151,29 +152,53 @@ export default function SettingsPage() {
       {/* Subscription */}
       <Section icon={CreditCard} title="Subscription" description="Your current plan">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">{tierLabel} plan</p>
-                <Badge variant={tier === "free" ? "secondary" : tier === "pro" ? "default" : "warning"}>
-                  {tier === "free" ? "Current" : "Active"}
-                </Badge>
-              </div>
-              <p className="mt-0.5 text-xs text-text-muted">
-                {tier === "free"
-                  ? "Upgrade to unlock more forecasts, SEC data, and unlimited alerts"
-                  : tier === "pro"
-                    ? "10 forecasts/day, 20 top picks, SEC EDGAR access"
-                    : "Unlimited forecasts, alerts, and CSV export"
-                }
-              </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">{tierLabel} plan</p>
+              <Badge variant={tier === "free" ? "secondary" : tier === "pro" ? "default" : "warning"}>
+                {tier === "free" ? "Current" : "Active"}
+              </Badge>
             </div>
+            <p className="mt-0.5 text-xs text-text-muted">
+              {tier === "free"
+                ? "Upgrade to unlock more forecasts, SEC data, and unlimited alerts"
+                : tier === "pro"
+                  ? "10 forecasts/day, 20 top picks, SEC EDGAR access"
+                  : "Unlimited forecasts, alerts, and CSV export"
+              }
+            </p>
           </div>
-          {tier === "free" && (
-            <Button variant="gradient" size="sm">
-              View Plans
-            </Button>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {tier === "free" ? (
+              <Link href="/billing">
+                <Button variant="gradient" size="sm">Upgrade Plan</Button>
+              </Link>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-text-muted hover:text-text-primary"
+                  onClick={async () => {
+                    try {
+                      const { data } = await billingApi.getPortal()
+                      window.location.href = data.portal_url
+                    } catch {
+                      toast.error("Failed to open billing portal")
+                    }
+                  }}
+                >
+                  Manage Billing &rarr;
+                </Button>
+                <Link href="/billing">
+                  <Button variant="gradient" size="sm" className="gap-1.5">
+                    <CreditCard className="size-3.5" />
+                    Change Plan
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </Section>
 

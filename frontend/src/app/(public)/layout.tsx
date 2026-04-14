@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { GoogleAuthWrapper } from "@/components/auth/GoogleAuthProvider"
 
 const navLinks = [
   { href: "#features", label: "Features" },
@@ -112,7 +113,9 @@ export default function PublicLayout({
       </nav>
 
       {/* Content */}
-      {children}
+      <GoogleAuthWrapper>
+        {children}
+      </GoogleAuthWrapper>
     </div>
   )
 }
