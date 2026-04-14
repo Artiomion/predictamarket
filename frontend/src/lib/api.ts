@@ -308,4 +308,17 @@ export const edgarApi = {
     api.get(`/api/edgar/${ticker}/cash-flow`, { params }),
 }
 
+// ── Billing API ─────────────────────────────────────
+
+export const billingApi = {
+  getPlans: () =>
+    api.get("/api/billing/plans"),
+  createCheckout: (data: { plan: string; billing: string }) =>
+    api.post<{ checkout_url: string }>("/api/billing/checkout", data),
+  getPortal: () =>
+    api.get<{ portal_url: string }>("/api/billing/portal"),
+  getSubscription: () =>
+    api.get("/api/billing/subscription"),
+}
+
 export default api

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,7 +10,6 @@ import { authApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth-store"
 
 export default function LoginPage() {
-  const router = useRouter()
   const { setUser, setAuth } = useAuthStore()
 
   const [email, setEmail] = useState("")

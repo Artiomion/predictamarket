@@ -21,11 +21,13 @@ const pageTitles: Record<string, string> = {
   "/earnings": "Earnings",
   "/notifications": "Notifications",
   "/settings": "Settings",
+  "/billing": "Billing",
+  "/billing/success": "Billing",
+  "/billing/cancel": "Billing",
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [socketConnected, setSocketConnected] = useState(false)
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore()
   const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
@@ -34,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Init WebSocket
   useEffect(() => {
     initSocket(token)
-    return onConnectionChange(setSocketConnected)
+    return onConnectionChange(() => {})
   }, [token])
 
   const title = pageTitles[pathname] || pathname.split("/").pop() || "PredictaMarket"
@@ -62,7 +64,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           title={title}
           user={headerUser}
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
-          socketConnected={socketConnected}
         />
         <main className="p-4 md:p-6">
           {children}

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { User, Bell, CreditCard, Trash2, Check } from "lucide-react"
+import { User, Bell, CreditCard, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -63,7 +63,7 @@ function Section({ icon: Icon, title, description, children }: {
 }
 
 export default function SettingsPage() {
-  const { user, setUser, logout } = useAuthStore()
+  const { user, setUser } = useAuthStore()
   const [name, setName] = useState(user?.full_name || "")
   const [saving, setSaving] = useState(false)
   const [emailAlerts, setEmailAlerts] = useState(true)

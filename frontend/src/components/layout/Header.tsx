@@ -14,10 +14,9 @@ interface HeaderProps {
   title: string
   user: { name: string; tier: string; avatar: string | null }
   onMobileMenuToggle: () => void
-  socketConnected?: boolean
 }
 
-export function Header({ title, user, onMobileMenuToggle, socketConnected = false }: HeaderProps) {
+export function Header({ title, user, onMobileMenuToggle }: HeaderProps) {
   const { setCommandPaletteOpen } = useUIStore()
   const logout = useAuthStore((s) => s.logout)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -84,6 +83,16 @@ export function Header({ title, user, onMobileMenuToggle, socketConnected = fals
             </span>
           )}
         </Link>
+
+        {/* Upgrade button for free tier */}
+        {user.tier === "free" && (
+          <Link
+            href="/billing"
+            className="hidden rounded-button bg-gradient-to-r from-accent-from to-accent-to px-3 py-1 text-xs font-medium text-bg-primary transition-opacity hover:opacity-90 sm:block"
+          >
+            Upgrade
+          </Link>
+        )}
 
         {/* User avatar + dropdown */}
         <div className="relative" ref={dropdownRef}>
