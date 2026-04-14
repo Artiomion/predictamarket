@@ -159,8 +159,8 @@ async def create_checkout(
         customer=customer_id,
         line_items=[{"price": price_id, "quantity": 1}],
         mode="subscription",
-        success_url="http://localhost:3000/billing/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url="http://localhost:3000/billing/cancel",
+        success_url=f"{settings.FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{settings.FRONTEND_URL}/billing/cancel",
         metadata={"user_id": str(user_id), "plan": body.plan},
     )
 
@@ -187,7 +187,7 @@ async def get_billing_portal(
     portal_session = await asyncio.to_thread(
         stripe.billing_portal.Session.create,
         customer=user.stripe_customer_id,
-        return_url="http://localhost:3000/settings",
+        return_url=f"{settings.FRONTEND_URL}/settings",
     )
 
     return {"portal_url": portal_session.url}
@@ -307,17 +307,18 @@ async def stripe_webhook(request: Request):
 
             await logger.ainfo("tier_upgraded", user_id=user_id, plan=plan, subscription_id=subscription_id)
 
-            try:
-                async for session in get_session():
-                    await session.execute(
-                        update(User)
-                        .where(User.id == uuid.UUID(user_id))
-                        .values(stripe_subscription_id=subscription_id)
-                    )
-                    await session.commit()
-                    break
-            except Exception:
-                await logger.aexception("save_subscription_id_failed", user_id=user_id)
+            if subscription_id:
+                try:
+                    async for session in get_session():
+                        await session.execute(
+                            update(User)
+                            .where(User.id == uuid.UUID(user_id))
+                            .values(stripe_subscription_id=subscription_id)
+                        )
+                        await session.commit()
+                        break
+                except Exception:
+                    await logger.aexception("save_subscription_id_failed", user_id=user_id)
 
     # ── customer.subscription.updated ────────────────────────────────────
     elif event_type == "customer.subscription.updated":
