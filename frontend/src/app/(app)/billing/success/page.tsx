@@ -53,7 +53,7 @@ export default function BillingSuccessPage() {
         fire()
       }).catch(() => {})
     }
-  }, [setUser])
+  }, [setUser, setAuth])
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">

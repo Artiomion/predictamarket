@@ -125,7 +125,7 @@ async def _get_or_create_stripe_customer(
 
 
 @router.get("/plans")
-async def get_plans():
+async def get_plans() -> list[dict]:
     """Return available subscription plans (public, no auth)."""
     return PLANS
 
@@ -140,7 +140,7 @@ async def create_checkout(
     body: CheckoutRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     """Create a Stripe Checkout Session for subscription."""
     user_id, _ = _require_user(request)
 
@@ -172,7 +172,7 @@ async def create_checkout(
 async def get_billing_portal(
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     """Create a Stripe Billing Portal session for managing subscription."""
     user_id, _ = _require_user(request)
 
@@ -197,7 +197,7 @@ async def get_billing_portal(
 async def get_subscription(
     request: Request,
     session: AsyncSession = Depends(get_session),
-):
+) -> dict:
     """Get current user's subscription status."""
     user_id, tier = _require_user(request)
 
@@ -263,7 +263,7 @@ async def _update_user_tier(user_id: str, plan: str) -> None:
 
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request) -> dict | JSONResponse:
     """Handle Stripe webhook events. Signature verification required."""
     payload = await request.body()
     sig = request.headers.get("stripe-signature")
