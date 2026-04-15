@@ -132,7 +132,7 @@ export default function StockPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-mono text-xl font-semibold">{ticker}</h1>
+              <motion.h1 layoutId={`ticker-${ticker}`} className="font-mono text-xl font-semibold">{ticker}</motion.h1>
             </div>
             <p className="mt-0.5 text-sm text-text-secondary">{instrument.name}</p>
             <div className="mt-2 flex items-center gap-2">

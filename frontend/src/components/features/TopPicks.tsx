@@ -96,8 +96,10 @@ export function TopPicks() {
                     </Link>
                   </td>
                   <td className="px-2 py-3">
-                    <Link href={`/stocks/${pick.ticker}`} className="block font-mono text-xs font-medium">
-                      {pick.ticker}
+                    <Link href={`/stocks/${pick.ticker}`} className="block">
+                      <motion.span layoutId={`ticker-${pick.ticker}`} className="font-mono text-xs font-medium">
+                        {pick.ticker}
+                      </motion.span>
                     </Link>
                   </td>
                   <td className="hidden px-2 py-3 sm:table-cell">
