@@ -101,7 +101,7 @@ export function Sidebar({ mobileOpen, onMobileClose, collapsed, onCollapsedChang
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
                     transition={{ duration: 0.15, ease: "easeOut" }}
-                    className="overflow-hidden whitespace-nowrap"
+                    className="overflow-hidden whitespace-nowrap text-ellipsis"
                   >
                     {item.label}
                   </motion.span>

@@ -49,7 +49,7 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
         className
       )}
     >
-      {signal}
+      {signal === "BUY" ? "▲ " : signal === "SELL" ? "▼ " : ""}{signal}
       {isHighConfidence && showWinRate && signal === "BUY" && (
         <span className="text-[10px] opacity-75">99.5% WR</span>
       )}

@@ -123,9 +123,13 @@ export default function LoginPage() {
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label htmlFor="password" className="text-sm text-text-secondary">Password</label>
-                <a href="#" className="text-xs text-text-muted hover:text-[var(--accent-from)]">
+                <button
+                  type="button"
+                  onClick={() => toast("Password reset coming soon", { description: "Contact support@predictamarket.com" })}
+                  className="text-xs text-text-muted hover:text-[var(--accent-from)]"
+                >
                   Forgot password?
-                </a>
+                </button>
               </div>
               <div className="relative">
                 <Input

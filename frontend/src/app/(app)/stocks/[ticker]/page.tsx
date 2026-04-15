@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { RefreshCw } from "lucide-react"
@@ -131,6 +132,15 @@ export default function StockPage() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-xs text-text-muted">
+        <Link href="/dashboard" className="hover:text-text-secondary">Dashboard</Link>
+        <span>/</span>
+        <Link href="/stocks" className="hover:text-text-secondary">Stocks</Link>
+        <span>/</span>
+        <span className="text-text-primary font-medium">{ticker}</span>
+      </nav>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-card bg-bg-elevated font-heading text-lg font-semibold text-text-secondary">
