@@ -122,8 +122,17 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
                 onClick={buildForecast}
                 disabled={building}
               >
-                Build Forecast
-                <ArrowRight className="size-4" />
+                {building ? (
+                  <>
+                    <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeLinecap="round" /></svg>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    Build Forecast
+                    <ArrowRight className="size-4" />
+                  </>
+                )}
               </Button>
             </motion.div>
           )}

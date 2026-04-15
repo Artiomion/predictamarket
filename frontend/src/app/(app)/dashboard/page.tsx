@@ -116,11 +116,17 @@ export default function DashboardPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-        <TopPicks />
-        <LatestSignals />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }}>
+          <TopPicks />
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
+          <LatestSignals />
+        </motion.div>
       </div>
 
-      <MarketNews />
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }}>
+        <MarketNews />
+      </motion.div>
     </div>
   )
 }

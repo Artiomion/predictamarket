@@ -115,7 +115,9 @@ api.interceptors.response.use(
 
     // 429 — rate limit
     if (error.response?.status === 429) {
-      toast.error("Rate limit exceeded. Try again later.")
+      toast.error("Rate limit exceeded. Try again later.", {
+        action: { label: "Upgrade", onClick: () => { window.location.href = "/billing" } },
+      })
     }
 
     // 500 — server error

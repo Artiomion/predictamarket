@@ -36,10 +36,11 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
   return (
     <motion.span
       initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+      animate={{ scale: [0.9, 1.1, 1], opacity: 1 }}
+      transition={{ duration: 0.6, ease: "easeOut", times: [0, 0.5, 1] }}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.97 }}
+      style={{ willChange: "transform" }}
       className={cn(
         "group inline-flex items-center gap-1.5 rounded-chip px-2 py-0.5 text-xs font-medium font-mono transition-shadow duration-150",
         config.bg,
