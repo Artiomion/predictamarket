@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Briefcase, Plus, TrendingUp, TrendingDown } from "lucide-react"
+import { Briefcase, Plus, TrendingUp, TrendingDown, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,8 @@ export default function PortfolioPage() {
   const [newName, setNewName] = useState("")
   const [newDesc, setNewDesc] = useState("")
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     portfolioApi.getPortfolios()
@@ -49,6 +51,22 @@ export default function PortfolioPage() {
       if (error.response?.status === 403) {
         toast.error("Upgrade to Pro to create more portfolios")
       }
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
+    try {
+      await portfolioApi.deletePortfolio(deleteId)
+      setPortfolios(portfolios.filter((p) => p.id !== deleteId))
+      if (expanded === deleteId) setExpanded(null)
+      toast.success("Portfolio deleted")
+    } catch {
+      toast.error("Failed to delete portfolio")
+    } finally {
+      setDeleting(false)
+      setDeleteId(null)
     }
   }
 
@@ -108,7 +126,7 @@ export default function PortfolioPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.3, ease: "easeOut" }}
-                  className="rounded-card border border-border-subtle bg-bg-surface transition-colors hover:border-border-hover"
+                  className="group rounded-card border border-border-subtle bg-bg-surface transition-colors hover:border-border-hover"
                 >
                   <button
                     onClick={() => setExpanded(isExpanded ? null : portfolio.id)}
@@ -125,7 +143,7 @@ export default function PortfolioPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p className="font-mono text-base font-medium tabular-nums">
                           ${(portfolio.total_value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -135,6 +153,13 @@ export default function PortfolioPage() {
                           <PriceChange value={portfolio.total_pnl_pct} className="text-xs" />
                         </div>
                       </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(portfolio.id) }}
+                        className="rounded-button p-1.5 text-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-danger/10 hover:text-danger"
+                        title="Delete portfolio"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
                   </button>
 
@@ -179,6 +204,29 @@ export default function PortfolioPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button variant="gradient" onClick={handleCreate} disabled={!newName.trim()}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete portfolio?</DialogTitle>
+            <DialogDescription>
+              All positions in this portfolio will be permanently deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Keep portfolio</Button>
+            <Button
+              variant="outline"
+              className="border-danger/30 text-danger hover:bg-danger/10"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete portfolio"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
