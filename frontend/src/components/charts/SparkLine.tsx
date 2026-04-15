@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 
 interface SparkLineProps {
@@ -18,53 +18,83 @@ export function SparkLine({
   className,
   color,
 }: SparkLineProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [inView, setInView] = useState(false)
 
   const isPositive = data.length >= 2 && data[data.length - 1] >= data[0]
   const strokeColor = color || (isPositive ? "#00FF88" : "#FF3366")
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas || data.length < 2) return
-
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = width * dpr
-    canvas.height = height * dpr
-    ctx.scale(dpr, dpr)
-
+  const points = useMemo(() => {
+    if (data.length < 2) return ""
     const min = Math.min(...data)
     const max = Math.max(...data)
     const range = max - min || 1
     const stepX = width / (data.length - 1)
 
-    ctx.clearRect(0, 0, width, height)
-    ctx.beginPath()
-    ctx.strokeStyle = strokeColor
-    ctx.lineWidth = 1.5
-    ctx.lineJoin = "round"
-    ctx.lineCap = "round"
+    return data
+      .map((value, i) => {
+        const x = i * stepX
+        const y = height - ((value - min) / range) * (height - 4) - 2
+        return `${x},${y}`
+      })
+      .join(" ")
+  }, [data, width, height])
 
-    data.forEach((value, i) => {
-      const x = i * stepX
-      const y = height - ((value - min) / range) * (height - 4) - 2
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    })
+  // IntersectionObserver for draw-on-scroll
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
 
-    ctx.stroke()
-  }, [data, width, height, strokeColor])
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.3 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Calculate path length for stroke-dashoffset animation
+  const polylineRef = useRef<SVGPolylineElement>(null)
+  const [pathLength, setPathLength] = useState(0)
+
+  useEffect(() => {
+    if (polylineRef.current) {
+      setPathLength(polylineRef.current.getTotalLength())
+    }
+  }, [points])
 
   return (
-    <canvas
-      ref={canvasRef}
+    <svg
+      ref={svgRef}
       width={width}
       height={height}
       className={cn("shrink-0", className)}
-      style={{ width, height }}
-    />
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <polyline
+        ref={polylineRef}
+        points={points}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        style={
+          pathLength > 0
+            ? {
+                strokeDasharray: pathLength,
+                strokeDashoffset: inView ? 0 : pathLength,
+                transition: "stroke-dashoffset 600ms ease-out",
+              }
+            : undefined
+        }
+      />
+    </svg>
   )
 }
 

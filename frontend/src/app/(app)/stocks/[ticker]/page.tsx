@@ -11,6 +11,8 @@ import { AlertButton } from "@/components/features/AlertButton"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePriceUpdate } from "@/lib/use-price-update"
 import { PriceChange } from "@/components/ui/price-change"
+import { NumberTransition } from "@/components/ui/number-transition"
+import { PriceFlash } from "@/components/ui/price-flash"
 import { StockChart } from "@/components/charts/StockChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
 import { FinancialsTab } from "@/components/features/FinancialsTab"
@@ -26,13 +28,17 @@ function LivePrice({ ticker, initialPrice, initialChangePct }: { ticker: string;
   if (!price) return null
   return (
     <div className="text-right">
-      <p className={cn(
-        "font-mono text-2xl font-medium tabular-nums transition-colors duration-300",
-        flash === "up" && "text-success",
-        flash === "down" && "text-danger",
-      )}>
-        ${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-      </p>
+      <PriceFlash flash={flash}>
+        <NumberTransition
+          value={price}
+          format="price"
+          className={cn(
+            "text-2xl font-medium transition-colors duration-300",
+            flash === "up" && "text-success",
+            flash === "down" && "text-danger",
+          )}
+        />
+      </PriceFlash>
       <PriceChange value={changePct} className="justify-end" />
     </div>
   )
