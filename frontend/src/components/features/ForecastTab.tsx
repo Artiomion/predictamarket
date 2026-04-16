@@ -223,7 +223,7 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
             </div>
             <div className="flex items-center gap-1.5">
               <Newspaper className="size-3" />
-              <span>{forecast.news_articles_used > 0 ? `Based on ${forecast.news_articles_used} articles` : "No news data available"}</span>
+              <span>{forecast.news_articles_used != null && forecast.news_articles_used > 0 ? `Based on ${forecast.news_articles_used} articles` : forecast.news_articles_used === 0 ? "No news data available" : "News sentiment from database"}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Calendar className="size-3" />
