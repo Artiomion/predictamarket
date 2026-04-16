@@ -1,17 +1,15 @@
 """Evaluate past forecasts against actual prices → populate forecast_history."""
 
-import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, text, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import async_session_factory
 from shared.models.forecast import Forecast, ForecastPoint, ForecastHistory
 from shared.models.market import PriceHistory
-from shared.utils import HORIZON_STEPS
 
 logger = structlog.get_logger()
 
@@ -28,8 +26,8 @@ EVAL_HORIZONS = {
 async def evaluate_forecasts(days_back: int = 30) -> dict:
     """Evaluate forecasts from the last N days against actual prices.
 
-    For each forecast + horizon, check if actual price exists in price_history,
-    compute error and correctness, upsert into forecast_history.
+    Batch-fetches prices to avoid N+1 queries. Uses (ticker, forecast_date, horizon_days)
+    as natural key for idempotent upserts.
     """
     evaluated = 0
     skipped = 0
@@ -37,7 +35,7 @@ async def evaluate_forecasts(days_back: int = 30) -> dict:
     async with async_session_factory() as session:
         cutoff = date.today() - timedelta(days=days_back)
 
-        # Get all forecasts with their points in the evaluation window
+        # 1. Get all forecasts with their points in the evaluation window
         result = await session.execute(
             select(Forecast, ForecastPoint)
             .join(ForecastPoint, ForecastPoint.forecast_id == Forecast.id)
@@ -45,41 +43,85 @@ async def evaluate_forecasts(days_back: int = 30) -> dict:
             .where(ForecastPoint.horizon_label.in_(list(EVAL_HORIZONS.keys())))
             .order_by(Forecast.forecast_date.desc())
         )
-        rows = result.all()
+        forecast_rows = result.all()
 
-        for forecast, point in rows:
+        if not forecast_rows:
+            return {"evaluated": 0, "skipped": 0}
+
+        # 2. Collect all (ticker, date_range) pairs needed for price lookup
+        tickers = set()
+        min_date = date.today()
+        max_date = cutoff
+        for forecast, point in forecast_rows:
+            tickers.add(forecast.ticker)
+            if forecast.forecast_date < min_date:
+                min_date = forecast.forecast_date
+            horizon_days = EVAL_HORIZONS.get(point.horizon_label, 1)
+            target = forecast.forecast_date + timedelta(days=int(horizon_days * 1.5) + 2)
+            if target > max_date:
+                max_date = target
+
+        # 3. Batch-fetch all relevant prices in one query
+        price_result = await session.execute(
+            select(PriceHistory.ticker, PriceHistory.date, PriceHistory.close)
+            .where(
+                and_(
+                    PriceHistory.ticker.in_(list(tickers)),
+                    PriceHistory.date >= min_date,
+                    PriceHistory.date <= max_date,
+                )
+            )
+        )
+        # Build lookup: {(ticker, date): close}
+        price_map: dict[tuple[str, date], float] = {}
+        for row in price_result.all():
+            price_map[(row.ticker, row.date)] = float(row.close)
+
+        # 4. Check which (ticker, forecast_date, horizon_days) already evaluated
+        existing_result = await session.execute(
+            select(
+                ForecastHistory.ticker,
+                ForecastHistory.forecast_date,
+                ForecastHistory.horizon_days,
+            )
+            .where(ForecastHistory.forecast_date >= cutoff)
+            .where(ForecastHistory.actual_price.isnot(None))
+        )
+        existing_keys = set(
+            (r.ticker, r.forecast_date, r.horizon_days)
+            for r in existing_result.all()
+        )
+
+        # 5. Evaluate each forecast point
+        inserts = []
+        for forecast, point in forecast_rows:
             horizon_days = EVAL_HORIZONS.get(point.horizon_label)
             if not horizon_days:
                 continue
 
-            # Compute target date (trading days approximation using calendar days * 1.4)
-            # More accurate: just look for the Nth available price after forecast_date
-            target_date = forecast.forecast_date + timedelta(days=int(horizon_days * 1.4) + 1)
-
-            # Find actual close price on or near target date
-            price_result = await session.execute(
-                select(PriceHistory.close, PriceHistory.date)
-                .where(
-                    and_(
-                        PriceHistory.ticker == forecast.ticker,
-                        PriceHistory.date >= forecast.forecast_date + timedelta(days=horizon_days),
-                        PriceHistory.date <= target_date,
-                    )
-                )
-                .order_by(PriceHistory.date.asc())
-                .limit(1)
-            )
-            price_row = price_result.first()
-
-            if not price_row:
+            # Skip already evaluated
+            key = (forecast.ticker, forecast.forecast_date, horizon_days)
+            if key in existing_keys:
                 skipped += 1
                 continue
 
-            actual_price = float(price_row.close)
-            predicted_price = float(point.median)
-            error_pct = round((predicted_price - actual_price) / actual_price * 100, 2)
+            # Find actual price: look for closest date in range
+            actual_price = None
+            for offset in range(horizon_days, int(horizon_days * 1.5) + 3):
+                target_date = forecast.forecast_date + timedelta(days=offset)
+                price = price_map.get((forecast.ticker, target_date))
+                if price is not None:
+                    actual_price = price
+                    break
 
-            # Was the signal correct?
+            if actual_price is None:
+                skipped += 1
+                continue
+
+            predicted_price = float(point.median)
+            error_pct = round((predicted_price - actual_price) / actual_price * 100, 2) if actual_price != 0 else 0.0
+
+            # Direction: did price move in the direction the signal predicted?
             was_correct = None
             if forecast.signal and forecast.current_close:
                 if forecast.signal == "BUY":
@@ -87,31 +129,24 @@ async def evaluate_forecasts(days_back: int = 30) -> dict:
                 elif forecast.signal == "SELL":
                     was_correct = actual_price < forecast.current_close
 
-            # Upsert into forecast_history
-            stmt = pg_insert(ForecastHistory).values(
-                instrument_id=forecast.instrument_id,
-                ticker=forecast.ticker,
-                forecast_date=forecast.forecast_date,
-                horizon_days=horizon_days,
-                predicted_price=predicted_price,
-                actual_price=actual_price,
-                error_pct=error_pct,
-                signal=forecast.signal,
-                was_correct=was_correct,
-                evaluated_at=datetime.now(timezone.utc),
-            ).on_conflict_do_update(
-                index_elements=["id"],
-                set_={
-                    "actual_price": actual_price,
-                    "error_pct": error_pct,
-                    "was_correct": was_correct,
-                    "evaluated_at": datetime.now(timezone.utc),
-                },
-            )
-            await session.execute(stmt)
+            inserts.append({
+                "instrument_id": forecast.instrument_id,
+                "ticker": forecast.ticker,
+                "forecast_date": forecast.forecast_date,
+                "horizon_days": horizon_days,
+                "predicted_price": predicted_price,
+                "actual_price": actual_price,
+                "error_pct": error_pct,
+                "signal": forecast.signal,
+                "was_correct": was_correct,
+                "evaluated_at": datetime.now(timezone.utc),
+            })
             evaluated += 1
 
-        await session.commit()
+        # 6. Bulk insert
+        if inserts:
+            await session.execute(pg_insert(ForecastHistory), inserts)
+            await session.commit()
 
     await logger.ainfo("evaluation_complete", evaluated=evaluated, skipped=skipped)
     return {"evaluated": evaluated, "skipped": skipped}
@@ -154,9 +189,9 @@ async def get_accuracy(
         }
 
     total = len(rows)
-    correct_direction = sum(1 for r in rows if r.was_correct is True)
-    correct_signal = sum(1 for r in rows if r.was_correct is True)
-    mape = round(sum(abs(r.error_pct) for r in rows) / total, 2)
+    signals_with_result = [r for r in rows if r.was_correct is not None]
+    correct_direction = sum(1 for r in signals_with_result if r.was_correct is True)
+    mape = round(sum(abs(r.error_pct or 0) for r in rows) / total, 2)
 
     predictions = [
         {
@@ -170,13 +205,22 @@ async def get_accuracy(
         for r in rows
     ]
 
+    direction_pct = round(correct_direction / len(signals_with_result) * 100, 1) if signals_with_result else None
+    # Win rate = % of BUY signals where price went up + SELL signals where price went down
+    buy_signals = [r for r in signals_with_result if r.signal == "BUY"]
+    sell_signals = [r for r in signals_with_result if r.signal == "SELL"]
+    buy_wins = sum(1 for r in buy_signals if r.was_correct)
+    sell_wins = sum(1 for r in sell_signals if r.was_correct)
+    total_signals = len(buy_signals) + len(sell_signals)
+    win_rate = round((buy_wins + sell_wins) / total_signals * 100, 1) if total_signals else None
+
     return {
         "ticker": ticker.upper(),
         "horizon": horizon,
         "period_days": days,
         "total_forecasts": total,
-        "direction_accuracy": round(correct_direction / total * 100, 1) if total else None,
+        "direction_accuracy": direction_pct,
         "mape": mape,
-        "win_rate": round(correct_signal / total * 100, 1) if total else None,
+        "win_rate": win_rate,
         "predictions": predictions,
     }
