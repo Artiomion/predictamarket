@@ -9,6 +9,7 @@ import { SignalBadge } from "@/components/ui/signal-badge"
 import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { WaterfallChart } from "@/components/charts/WaterfallChart"
+import { AccuracyCard } from "@/components/features/AccuracyCard"
 import { ForecastChart } from "@/components/charts/ForecastChart"
 import { forecastApi } from "@/lib/api"
 import type { Forecast, ForecastHorizon } from "@/types"
@@ -247,6 +248,9 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
       {forecast.variable_importance?.top_factors?.length > 0 && (
         <WaterfallChart factors={forecast.variable_importance.top_factors} />
       )}
+
+      {/* Accuracy */}
+      <AccuracyCard ticker={ticker} />
     </div>
   )
 }

@@ -148,6 +148,18 @@ async def get_forecast(
     return data
 
 
+@router.get("/{ticker}/accuracy")
+async def forecast_accuracy(
+    ticker: str,
+    horizon: str = Query("1d", regex="^(1d|3d|1w|2w|1m)$"),
+    days: int = Query(30, ge=7, le=365),
+    session: AsyncSession = Depends(get_read_session),
+) -> dict:
+    """Get forecast accuracy metrics vs actual prices."""
+    from services.evaluation import get_accuracy
+    return await get_accuracy(session, ticker, horizon=horizon, days=days)
+
+
 @router.get("/{ticker}/history", response_model=list[ForecastFromDB])
 async def forecast_history(
     ticker: str,

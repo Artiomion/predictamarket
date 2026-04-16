@@ -28,3 +28,13 @@ async def run_batch_forecast(
     from scripts.run_batch_forecast import main
     bg.add_task(_run_script, "run_batch_forecast", main)
     return {"status": "accepted", "task": "run_batch_forecast"}
+
+
+@router.post("/admin/evaluate")
+async def evaluate_forecasts_endpoint(
+    _key: str = Depends(require_internal_key),
+) -> dict:
+    """Evaluate past forecasts against actual prices (synchronous, fast)."""
+    from services.evaluation import evaluate_forecasts
+    result = await evaluate_forecasts(days_back=30)
+    return {"status": "completed", **result}
