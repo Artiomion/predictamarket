@@ -50,7 +50,7 @@ export function WalkForwardChart({ ticker }: { ticker: string }) {
         setHistory(histRes.data)
         setForecasts(wfRes.data)
       })
-      .catch(() => {})
+      .catch(() => { setForecasts([]) })
       .finally(() => setLoading(false))
   }, [ticker])
 
