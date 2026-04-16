@@ -60,13 +60,13 @@ function processTrade(trade: FinnhubTrade) {
 }
 
 export function connectFinnhub(token: string) {
-  if (ws && ws.readyState === WebSocket.OPEN) return
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
 
   ws = new WebSocket(`${FINNHUB_WS_URL}?token=${token}`)
 
   ws.onopen = () => {
-    if (subscribedSymbol) {
-      ws?.send(JSON.stringify({ type: "subscribe", symbol: subscribedSymbol }))
+    if (subscribedSymbol && ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "subscribe", symbol: subscribedSymbol }))
     }
   }
 
@@ -98,7 +98,7 @@ export function subscribeFinnhub(
 ) {
   // Unsubscribe previous
   if (subscribedSymbol && ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "unsubscribe", symbol: subscribedSymbol }))
+    try { ws.send(JSON.stringify({ type: "unsubscribe", symbol: subscribedSymbol })) } catch { /* ignore */ }
   }
 
   subscribedSymbol = symbol.toUpperCase()
@@ -107,13 +107,13 @@ export function subscribeFinnhub(
   onUpdate = callback
 
   if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "subscribe", symbol: subscribedSymbol }))
+    try { ws.send(JSON.stringify({ type: "subscribe", symbol: subscribedSymbol })) } catch { /* ignore */ }
   }
 }
 
 export function unsubscribeFinnhub() {
   if (subscribedSymbol && ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "unsubscribe", symbol: subscribedSymbol }))
+    try { ws.send(JSON.stringify({ type: "unsubscribe", symbol: subscribedSymbol })) } catch { /* ignore */ }
   }
   subscribedSymbol = null
   onUpdate = null
