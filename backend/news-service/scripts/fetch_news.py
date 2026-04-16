@@ -73,12 +73,18 @@ RSS_FEEDS: list[dict[str, str]] = [
     {"name": "Seeking Alpha", "url": "https://seekingalpha.com/market_currents.xml"},
 ]
 
-# Yahoo Finance RSS supports per-ticker feeds: /rss/2.0/headline?s=AAPL
-# We fetch the top tickers to get ticker-specific news
+# Yahoo Finance RSS per-ticker feeds for all 94 S&P 500 tickers in our model
 TICKER_RSS_TICKERS = [
-    "AAPL", "MSFT", "NVDA", "GOOG", "AMZN", "META", "TSLA", "JPM", "GS",
-    "CVX", "XOM", "LLY", "NKE", "DIS", "NFLX", "COST", "MRK", "PFE",
-    "BA", "ORCL", "CRM", "INTC", "AMD", "MU", "QCOM",
+    "AAPL", "ABT", "ACGL", "CHD", "CHRW", "CMS", "CNP", "COF", "COHR", "COO",
+    "COP", "COR", "COST", "CPB", "CPRT", "CPT", "CRH", "CSGP", "CSX", "CTAS",
+    "CTRA", "CTSH", "CVX", "DD", "DE", "DECK", "DGX", "DHI", "DHR", "DIS",
+    "DLTR", "DOC", "DOV", "DRI", "EBAY", "EVRG", "EXC", "FAST", "FFIV", "FICO",
+    "FITB", "FIX", "FRT", "GE", "GEN", "GILD", "GIS", "GL", "GLW", "GPC",
+    "GS", "GWW", "HAL", "HAS", "HBAN", "HOLX", "HRL", "LEN", "LH", "LHX",
+    "LII", "LIN", "LLY", "LMT", "LNT", "LOW", "LRCX", "LUV", "MNST", "MOS",
+    "MRK", "MS", "MSFT", "MSI", "MTB", "MTD", "MU", "NDSN", "NEE", "NEM",
+    "NKE", "NOC", "NSC", "NTAP", "NTRS", "NUE", "NVDA", "NVR", "ODFL", "OKE",
+    "ORCL", "ORLY", "OXY", "PAYX", "ZBRA",
 ]
 
 
