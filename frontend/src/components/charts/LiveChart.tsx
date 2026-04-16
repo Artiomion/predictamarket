@@ -22,9 +22,8 @@ import {
   RESOLUTION_MS,
   type CandleBar,
 } from "@/lib/finnhub"
+import api from "@/lib/api"
 import type { PriceBar } from "@/types"
-
-const FINNHUB_KEY = process.env.NEXT_PUBLIC_FINNHUB_KEY || ""
 
 interface TimeframeConfig {
   id: string
@@ -176,34 +175,40 @@ export function LiveChart({ ticker = "AAPL" }: { ticker?: string }) {
 
   // Finnhub WebSocket for real-time tick updates
   useEffect(() => {
-    if (!FINNHUB_KEY || !ticker) return
+    if (!ticker) return
 
-    connectFinnhub(FINNHUB_KEY)
+    // Fetch WS token from authenticated endpoint
+    let cancelled = false
+    api.get("/api/finnhub/ws-token")
+      .then(({ data }) => {
+        if (cancelled || !data.token) return
+        connectFinnhub(data.token)
 
-    const resMs = RESOLUTION_MS["D"] || 86400000
+        const resMs = RESOLUTION_MS["D"] || 86400000
+        subscribeFinnhub(ticker, resMs, (candle: CandleBar) => {
+          setLivePrice(candle.close)
 
-    subscribeFinnhub(ticker, resMs, (candle: CandleBar) => {
-      setLivePrice(candle.close)
-
-      // Update last candle on chart
-      if (candleRef.current && history.length > 0) {
-        const last = history[history.length - 1]
-        candleRef.current.update({
-          time: last.date as string,
-          open: last.open,
-          high: Math.max(last.high, candle.close),
-          low: Math.min(last.low, candle.close),
-          close: candle.close,
+          if (candleRef.current && history.length > 0) {
+            const last = history[history.length - 1]
+            candleRef.current.update({
+              time: last.date as string,
+              open: last.open,
+              high: Math.max(last.high, candle.close),
+              low: Math.min(last.low, candle.close),
+              close: candle.close,
+            })
+            volumeRef.current?.update({
+              time: last.date as string,
+              value: last.volume,
+              color: candle.close >= last.open ? "rgba(0,255,136,0.3)" : "rgba(255,51,102,0.3)",
+            })
+          }
         })
-        volumeRef.current?.update({
-          time: last.date as string,
-          value: last.volume,
-          color: candle.close >= last.open ? "rgba(0,255,136,0.3)" : "rgba(255,51,102,0.3)",
-        })
-      }
-    })
+      })
+      .catch(() => {}) // WS optional — chart works without it
 
     return () => {
+      cancelled = true
       unsubscribeFinnhub()
     }
   }, [ticker, history])

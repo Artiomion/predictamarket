@@ -2,7 +2,7 @@
 
 import httpx
 import structlog
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from shared.config import settings
 
