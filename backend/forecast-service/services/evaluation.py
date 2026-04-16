@@ -43,10 +43,20 @@ async def evaluate_forecasts(days_back: int = 30) -> dict:
             .where(ForecastPoint.horizon_label.in_(list(EVAL_HORIZONS.keys())))
             .order_by(Forecast.forecast_date.desc())
         )
-        forecast_rows = result.all()
+        all_rows = result.all()
 
-        if not forecast_rows:
+        if not all_rows:
             return {"evaluated": 0, "skipped": 0}
+
+        # Deduplicate: keep only the newest forecast per (ticker, date, horizon)
+        seen_forecast_keys: set[tuple[str, date, str]] = set()
+        forecast_rows = []
+        for forecast, point in all_rows:
+            key = (forecast.ticker, forecast.forecast_date, point.horizon_label)
+            if key in seen_forecast_keys:
+                continue
+            seen_forecast_keys.add(key)
+            forecast_rows.append((forecast, point))
 
         # 2. Collect all (ticker, date_range) pairs needed for price lookup
         tickers = set()
