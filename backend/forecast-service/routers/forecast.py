@@ -3,7 +3,9 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from shared.auth import require_user_id
 from shared.database import get_read_session, get_session
@@ -28,6 +30,7 @@ from services.forecast_service import (
     store_forecast,
 )
 from services.forecast_service import VALID_TICKERS
+from shared.models.forecast import Forecast
 from services.inference import run_inference
 from services.model_loader import artifacts
 
@@ -170,8 +173,6 @@ async def walk_forward(
 
     Deduplicates by forecast_date (keeps most recent per day).
     """
-    from sqlalchemy.orm import selectinload
-
     result = await session.execute(
         select(Forecast)
         .where(Forecast.ticker == ticker.upper())
