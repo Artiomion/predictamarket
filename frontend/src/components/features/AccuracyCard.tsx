@@ -76,19 +76,7 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
     )
   }
 
-  if (!data || data.total_forecasts === 0) {
-    return (
-      <div className="rounded-card border border-border-subtle bg-bg-surface p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="size-4 text-text-muted" />
-          <h3 className="font-heading text-sm font-medium">Forecast Accuracy</h3>
-        </div>
-        <p className="text-sm text-text-muted">
-          No accuracy data available yet. Forecasts need at least {horizon === "1d" ? "1 day" : horizon === "1w" ? "1 week" : "1 month"} of history to evaluate.
-        </p>
-      </div>
-    )
-  }
+  const isEmpty = !data || data.total_forecasts === 0
 
   return (
     <motion.div
@@ -97,12 +85,12 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
       transition={{ duration: 0.3 }}
       className="rounded-card border border-border-subtle bg-bg-surface p-5"
     >
-      {/* Header */}
+      {/* Header — always visible with horizon selector */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Target className="size-4 text-[var(--accent-from)]" />
+          <Target className={cn("size-4", isEmpty ? "text-text-muted" : "text-[var(--accent-from)]")} />
           <h3 className="font-heading text-sm font-medium">Forecast Accuracy</h3>
-          <span className="text-xs text-text-muted">({data.total_forecasts} forecasts)</span>
+          {!isEmpty && <span className="text-xs text-text-muted">({data.total_forecasts} forecasts)</span>}
         </div>
         <FilterChip
           options={horizonOptions}
@@ -111,6 +99,13 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
           label=""
         />
       </div>
+
+      {isEmpty ? (
+        <p className="text-sm text-text-muted">
+          No accuracy data available yet. Forecasts need at least {horizon === "1d" ? "1 day" : horizon === "1w" ? "1 week" : "1 month"} of history to evaluate.
+        </p>
+      ) : (
+      <>
 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -178,6 +173,8 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
           </tbody>
         </table>
       </div>
+      </>
+      )}
     </motion.div>
   )
 }
