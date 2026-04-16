@@ -13,7 +13,7 @@ import asyncio
 import json
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from html import unescape as html_unescape
 from pathlib import Path
 from time import mktime
@@ -314,12 +314,13 @@ async def process_and_store(entries: list[dict]) -> dict[str, int]:
 
 
 async def update_daily_sentiment() -> None:
-    """Aggregate today's sentiment per ticker into sentiment_daily."""
-    today = date.today()
+    """Aggregate sentiment per ticker per day (last 7 days) into sentiment_daily."""
+    cutoff = date.today() - timedelta(days=7)
 
     async with async_session_factory() as session:
         rows = await session.execute(
             select(
+                func.date(Article.published_at).label("pub_date"),
                 InstrumentSentiment.ticker,
                 InstrumentSentiment.instrument_id,
                 func.avg(InstrumentSentiment.sentiment_score).label("avg_sent"),
@@ -329,15 +330,15 @@ async def update_daily_sentiment() -> None:
                 func.sum(func.cast(InstrumentSentiment.sentiment_label == "neutral", Integer)).label("neu"),
             )
             .join(Article, Article.id == InstrumentSentiment.article_id)
-            .where(func.date(Article.published_at) == today)
-            .group_by(InstrumentSentiment.ticker, InstrumentSentiment.instrument_id)
+            .where(func.date(Article.published_at) >= cutoff)
+            .group_by(func.date(Article.published_at), InstrumentSentiment.ticker, InstrumentSentiment.instrument_id)
         )
 
         for row in rows.all():
             stmt = pg_insert(SentimentDaily).values(
                 instrument_id=row.instrument_id,
                 ticker=row.ticker,
-                date=today,
+                date=row.pub_date,
                 avg_sentiment=float(row.avg_sent) if row.avg_sent else None,
                 news_count=row.cnt,
                 positive_count=row.pos or 0,
