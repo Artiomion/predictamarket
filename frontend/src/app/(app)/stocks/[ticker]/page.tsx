@@ -14,7 +14,7 @@ import { usePriceUpdate } from "@/lib/use-price-update"
 import { PriceChange } from "@/components/ui/price-change"
 import { NumberTransition } from "@/components/ui/number-transition"
 import { PriceFlash } from "@/components/ui/price-flash"
-import { StockChart } from "@/components/charts/StockChart"
+import { LiveChart } from "@/components/charts/LiveChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
 import { FinancialsTab } from "@/components/features/FinancialsTab"
 import { NewsTab } from "@/components/features/NewsTab"
@@ -190,7 +190,7 @@ export default function StockPage() {
       </div>
 
       <div>
-        {activeTab === "chart" && <StockChart ticker={ticker} />}
+        {activeTab === "chart" && <LiveChart ticker={ticker} />}
         {activeTab === "forecast" && <ForecastTab ticker={ticker} />}
         {activeTab === "financials" && <FinancialsTab ticker={ticker} />}
         {activeTab === "news" && <NewsTab ticker={ticker} />}

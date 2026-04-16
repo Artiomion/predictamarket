@@ -21,6 +21,8 @@ PUBLIC_ROUTES: list[tuple[str, set[str]]] = [
     ("/api/earnings/upcoming",             {"GET"}),
     ("/api/billing/webhook",               {"POST"}),
     ("/api/billing/plans",                 {"GET"}),
+    ("/api/finnhub/candles",               {"GET"}),
+    ("/api/finnhub/ws-token",              {"GET"}),
 ]
 
 # Prefix-based public GET routes (e.g. /api/market/instruments/AAPL/*)

@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # Frontend URL (for Stripe redirects)
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Finnhub
+    FINNHUB_API_KEY: str = ""
+
     # App
     APP_ENV: str = "development"
     DEBUG: bool = True

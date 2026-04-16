@@ -263,7 +263,7 @@ async def _update_user_tier(user_id: str, plan: str) -> None:
 
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request) -> dict | JSONResponse:
+async def stripe_webhook(request: Request):
     """Handle Stripe webhook events. Signature verification required."""
     payload = await request.body()
     sig = request.headers.get("stripe-signature")
