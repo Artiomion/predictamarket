@@ -150,7 +150,7 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
   return (
     <div className="space-y-6">
       {/* Not persisted warning */}
-      {!forecast.persisted && (
+      {forecast.persisted === false && (
         <div className="flex items-center gap-2 rounded-card border border-warning/20 bg-warning/5 px-4 py-2 text-xs text-warning">
           <AlertTriangle className="size-3.5 shrink-0" />
           Forecast could not be saved to database. Results are temporary.
