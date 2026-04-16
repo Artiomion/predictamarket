@@ -61,11 +61,24 @@ LARGE_CAP_TICKERS = {
 }
 
 RSS_FEEDS: list[dict[str, str]] = [
+    # General market news
     {"name": "Yahoo Finance", "url": "https://finance.yahoo.com/news/rssindex"},
     {"name": "Yahoo Finance Top", "url": "https://finance.yahoo.com/rss/topfinstories"},
     {"name": "Reuters Business", "url": "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best"},
     {"name": "MarketWatch Top", "url": "https://feeds.marketwatch.com/marketwatch/topstories/"},
     {"name": "MarketWatch Markets", "url": "https://feeds.marketwatch.com/marketwatch/marketpulse/"},
+    {"name": "CNBC Top", "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html"},
+    {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html"},
+    {"name": "Investing.com", "url": "https://www.investing.com/rss/news.rss"},
+    {"name": "Seeking Alpha", "url": "https://seekingalpha.com/market_currents.xml"},
+]
+
+# Yahoo Finance RSS supports per-ticker feeds: /rss/2.0/headline?s=AAPL
+# We fetch the top tickers to get ticker-specific news
+TICKER_RSS_TICKERS = [
+    "AAPL", "MSFT", "NVDA", "GOOG", "AMZN", "META", "TSLA", "JPM", "GS",
+    "CVX", "XOM", "LLY", "NKE", "DIS", "NFLX", "COST", "MRK", "PFE",
+    "BA", "ORCL", "CRM", "INTC", "AMD", "MU", "QCOM",
 ]
 
 
@@ -163,39 +176,59 @@ def determine_impact(
     return "low"
 
 
+def _parse_feed_entries(feed_cfg: dict, feed, seen_urls: set) -> list[dict]:
+    """Extract entries from a parsed feed, deduplicating by URL."""
+    entries = []
+    for entry in feed.entries:
+        url = entry.get("link", "")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+
+        published = None
+        if hasattr(entry, "published_parsed") and entry.published_parsed:
+            published = datetime.fromtimestamp(
+                mktime(entry.published_parsed), tz=timezone.utc
+            )
+        if not published:
+            published = datetime.now(timezone.utc)
+
+        raw_summary = entry.get("summary", "")
+        clean_summary = strip_html(raw_summary)[:500] if raw_summary else None
+
+        entries.append({
+            "title": strip_html(entry.get("title", "")),
+            "url": url,
+            "source": feed_cfg["name"],
+            "published_at": published,
+            "summary": clean_summary,
+        })
+    return entries
+
+
 async def fetch_rss_entries() -> list[dict]:
-    """Fetch and deduplicate RSS entries from all feeds."""
+    """Fetch and deduplicate RSS entries from general + ticker-specific feeds."""
     all_entries: list[dict] = []
     seen_urls: set[str] = set()
 
+    # 1. General feeds
     for feed_cfg in RSS_FEEDS:
         try:
-            feed = await asyncio.to_thread(feedparser.parse, feed_cfg["url"])
-            for entry in feed.entries:
-                url = entry.get("link", "")
-                if not url or url in seen_urls:
-                    continue
-                seen_urls.add(url)
+            feed = await asyncio.to_thread(
+                feedparser.parse, feed_cfg["url"],
+            )
+            all_entries.extend(_parse_feed_entries(feed_cfg, feed, seen_urls))
+        except Exception as exc:
+            await logger.aerror("rss_fetch_error", feed=feed_cfg["name"], error=str(exc))
 
-                published = None
-                if hasattr(entry, "published_parsed") and entry.published_parsed:
-                    published = datetime.fromtimestamp(
-                        mktime(entry.published_parsed), tz=timezone.utc
-                    )
-                if not published:
-                    published = datetime.now(timezone.utc)
-
-            # Strip HTML from title and summary
-                raw_summary = entry.get("summary", "")
-                clean_summary = strip_html(raw_summary)[:500] if raw_summary else None
-
-                all_entries.append({
-                    "title": strip_html(entry.get("title", "")),
-                    "url": url,
-                    "source": feed_cfg["name"],
-                    "published_at": published,
-                    "summary": clean_summary,
-                })
+    # 2. Ticker-specific feeds (Yahoo Finance per-ticker RSS)
+    for ticker in TICKER_RSS_TICKERS:
+        feed_cfg = {"name": f"Yahoo {ticker}", "url": f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"}
+        try:
+            feed = await asyncio.to_thread(
+                feedparser.parse, feed_cfg["url"],
+            )
+            all_entries.extend(_parse_feed_entries(feed_cfg, feed, seen_urls))
         except Exception as exc:
             await logger.aerror("rss_fetch_error", feed=feed_cfg["name"], error=str(exc))
 
