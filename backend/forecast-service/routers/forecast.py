@@ -160,6 +160,44 @@ async def forecast_accuracy(
     return await get_accuracy(session, ticker, horizon=horizon, days=days)
 
 
+@router.get("/{ticker}/walk-forward")
+async def walk_forward(
+    ticker: str,
+    limit: int = Query(7, ge=1, le=14),
+    session: AsyncSession = Depends(get_read_session),
+) -> list[dict]:
+    """Get last N forecasts with full 22-step curves for walk-forward overlay."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from shared.models.forecast import Forecast, ForecastPoint
+
+    result = await session.execute(
+        select(Forecast)
+        .where(Forecast.ticker == ticker.upper())
+        .options(selectinload(Forecast.points))
+        .order_by(Forecast.created_at.desc())
+        .limit(limit)
+    )
+    forecasts = list(result.scalars().unique().all())
+
+    out = []
+    for f in forecasts:
+        # Sort points by step, extract medians
+        sorted_points = sorted(f.points, key=lambda p: p.step)
+        full_curve = [float(p.median) for p in sorted_points]
+        if not full_curve:
+            continue
+        out.append({
+            "forecast_date": f.forecast_date.isoformat(),
+            "current_close": float(f.current_close) if f.current_close else None,
+            "signal": f.signal,
+            "confidence": f.confidence,
+            "full_curve": full_curve,
+        })
+
+    return out
+
+
 @router.get("/{ticker}/history", response_model=list[ForecastFromDB])
 async def forecast_history(
     ticker: str,

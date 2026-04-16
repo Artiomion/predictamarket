@@ -226,6 +226,8 @@ export const forecastApi = {
     api.post<Forecast>(`/api/forecast/${ticker}`, null, { timeout: 60000 }),
   getAccuracy: (ticker: string, params?: { horizon?: string; days?: number }) =>
     api.get(`/api/forecast/${ticker}/accuracy`, { params }),
+  getWalkForward: (ticker: string, params?: { limit?: number }) =>
+    api.get(`/api/forecast/${ticker}/walk-forward`, { params }),
   getForecastHistory: (ticker: string, params?: { limit?: number }) =>
     api.get(`/api/forecast/${ticker}/history`, { params }),
   createBatch: (tickers: string[]) =>

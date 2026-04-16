@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { WaterfallChart } from "@/components/charts/WaterfallChart"
 import { AccuracyCard } from "@/components/features/AccuracyCard"
 import { ForecastChart } from "@/components/charts/ForecastChart"
+import { WalkForwardChart } from "@/components/charts/WalkForwardChart"
 import { forecastApi } from "@/lib/api"
 import type { Forecast, ForecastHorizon } from "@/types"
 import { cn } from "@/lib/utils"
@@ -248,6 +249,18 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
       {forecast.variable_importance?.top_factors?.length > 0 && (
         <WaterfallChart factors={forecast.variable_importance.top_factors} />
       )}
+
+      {/* Accuracy */}
+      {/* Walk-Forward */}
+      <div className="rounded-card border border-border-subtle bg-bg-surface p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-heading text-sm font-medium">Walk-Forward Analysis</h3>
+            <p className="mt-0.5 text-xs text-text-muted">How the model&apos;s predictions evolved over the last 7 days</p>
+          </div>
+        </div>
+        <WalkForwardChart ticker={ticker} />
+      </div>
 
       {/* Accuracy */}
       <AccuracyCard ticker={ticker} />
