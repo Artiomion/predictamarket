@@ -288,48 +288,73 @@ def _fetch_news_sentiment_sync(
     n_components: int = 32,
     max_articles: int = 20,
 ) -> pd.DataFrame:
-    """Fetch RSS → FinBERT embeddings → PCA → daily sent_0..sent_31 + news_count."""
-    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
-    try:
-        resp = requests.get(url, timeout=5)
-        feed = feedparser.parse(resp.text)
-    except Exception as exc:
-        structlog.get_logger().warning("rss_fetch_failed", ticker=ticker, error=str(exc))
-        return pd.DataFrame(columns=["Date"] + [f"sent_{i}" for i in range(n_components)] + ["news_count"])
+    """Read sentiment from news.instrument_sentiment (already computed by news-service).
 
-    articles = []
-    for entry in feed.entries[:max_articles]:
-        try:
-            pub = pd.to_datetime(entry.get("published", "")).tz_localize(None).normalize()
-        except Exception:
-            pub = pd.Timestamp.now().normalize()
-        text = (entry.get("title", "") + ". " + entry.get("summary", ""))[:512]
-        articles.append({"date": pub, "text": text})
+    Falls back to zeros if no sentiment data available.
+    """
+    import asyncio
+    from shared.database import async_session_factory
+    from sqlalchemy import select, text
 
     empty_cols = ["Date"] + [f"sent_{i}" for i in range(n_components)] + ["news_count"]
-    if not articles:
+
+    try:
+        async def _fetch():
+            async with async_session_factory() as session:
+                result = await session.execute(text("""
+                    SELECT a.published_at::date as date, s.sentiment_score, a.title, a.summary
+                    FROM news.instrument_sentiment s
+                    JOIN news.articles a ON s.article_id = a.id
+                    WHERE s.ticker = :ticker
+                    AND a.published_at >= NOW() - INTERVAL '90 days'
+                    ORDER BY a.published_at DESC
+                    LIMIT :limit
+                """), {"ticker": ticker, "limit": max_articles})
+                return result.all()
+
+        rows = asyncio.get_event_loop().run_until_complete(_fetch())
+    except Exception as exc:
+        structlog.get_logger().warning("sentiment_db_fetch_failed", ticker=ticker, error=str(exc))
+        try:
+            rows = asyncio.run(_fetch())
+        except Exception:
+            return pd.DataFrame(columns=empty_cols)
+
+    if not rows:
         return pd.DataFrame(columns=empty_cols)
 
-    texts = [a["text"] for a in articles]
-    dates = [a["date"] for a in articles]
+    # Build sentiment features using PCA on FinBERT if available, else use score as proxy
+    articles_data = []
+    for row in rows:
+        pub_date = pd.Timestamp(row.date)
+        text_content = ((row.title or "") + ". " + (row.summary or ""))[:512]
+        articles_data.append({"date": pub_date, "text": text_content, "score": float(row.sentiment_score or 0.5)})
 
-    _FINBERT_BATCH = 16
-    _FINBERT_MAX_LEN = 512
-    all_emb = []
-    for i in range(0, len(texts), _FINBERT_BATCH):
-        batch = texts[i:i + _FINBERT_BATCH]
-        inputs = tokenizer(batch, padding=True, truncation=True, max_length=_FINBERT_MAX_LEN, return_tensors="pt")
-        with torch.no_grad():
-            outputs = finbert_model(**inputs)
-            cls = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-            all_emb.append(cls)
-        del inputs, outputs
+    if tokenizer is not None and finbert_model is not None and pca is not None:
+        # Full FinBERT → PCA pipeline
+        texts = [a["text"] for a in articles_data]
+        dates = [a["date"] for a in articles_data]
+        _FINBERT_BATCH = 16
+        all_emb = []
+        for i in range(0, len(texts), _FINBERT_BATCH):
+            batch = texts[i:i + _FINBERT_BATCH]
+            inputs = tokenizer(batch, padding=True, truncation=True, max_length=512, return_tensors="pt")
+            with torch.no_grad():
+                outputs = finbert_model(**inputs)
+                cls = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+                all_emb.append(cls)
+            del inputs, outputs
+        embeddings = np.vstack(all_emb)
+        reduced = pca.transform(embeddings)
+        df = pd.DataFrame(reduced, columns=[f"sent_{i}" for i in range(n_components)])
+        df["Date"] = dates
+    else:
+        # Fallback: use sentiment_score as sent_0, zeros for rest
+        df = pd.DataFrame({
+            "Date": [a["date"] for a in articles_data],
+            **{f"sent_{i}": [a["score"] if i == 0 else 0.0 for a in articles_data] for i in range(n_components)},
+        })
 
-    embeddings = np.vstack(all_emb)
-    reduced = pca.transform(embeddings)
-
-    df = pd.DataFrame(reduced, columns=[f"sent_{i}" for i in range(n_components)])
-    df["Date"] = dates
     daily = df.groupby("Date").agg(
         **{f"sent_{i}": (f"sent_{i}", "mean") for i in range(n_components)},
         news_count=("Date", "count"),
