@@ -290,45 +290,48 @@ def _fetch_news_sentiment_sync(
 ) -> pd.DataFrame:
     """Read sentiment from news.instrument_sentiment (already computed by news-service).
 
-    Falls back to zeros if no sentiment data available.
+    Uses sync psycopg2 since this runs inside asyncio.to_thread (sync context).
     """
-    import asyncio
-    from shared.database import async_session_factory
-    from sqlalchemy import select, text
+    import psycopg2
+    from shared.config import settings
 
     empty_cols = ["Date"] + [f"sent_{i}" for i in range(n_components)] + ["news_count"]
 
-    try:
-        async def _fetch():
-            async with async_session_factory() as session:
-                result = await session.execute(text("""
-                    SELECT a.published_at::date as date, s.sentiment_score, a.title, a.summary
-                    FROM news.instrument_sentiment s
-                    JOIN news.articles a ON s.article_id = a.id
-                    WHERE s.ticker = :ticker
-                    AND a.published_at >= NOW() - INTERVAL '90 days'
-                    ORDER BY a.published_at DESC
-                    LIMIT :limit
-                """), {"ticker": ticker, "limit": max_articles})
-                return result.all()
+    # Parse DATABASE_URL for psycopg2 (replace +asyncpg with nothing)
+    db_url = settings.DATABASE_URL.replace("+asyncpg", "").replace("postgresql://", "postgresql://")
 
-        rows = asyncio.get_event_loop().run_until_complete(_fetch())
+    try:
+        conn = psycopg2.connect(db_url)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT a.published_at::date as date, s.sentiment_score, a.title, a.summary
+            FROM news.instrument_sentiment s
+            JOIN news.articles a ON s.article_id = a.id
+            WHERE s.ticker = %s
+            AND a.published_at >= NOW() - INTERVAL '90 days'
+            ORDER BY a.published_at DESC
+            LIMIT %s
+        """, (ticker, max_articles))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
     except Exception as exc:
         structlog.get_logger().warning("sentiment_db_fetch_failed", ticker=ticker, error=str(exc))
-        try:
-            rows = asyncio.run(_fetch())
-        except Exception:
-            return pd.DataFrame(columns=empty_cols)
+        return pd.DataFrame(columns=empty_cols)
 
     if not rows:
         return pd.DataFrame(columns=empty_cols)
 
     # Build sentiment features using PCA on FinBERT if available, else use score as proxy
+    # psycopg2 rows: (date, sentiment_score, title, summary)
     articles_data = []
     for row in rows:
-        pub_date = pd.Timestamp(row.date)
-        text_content = ((row.title or "") + ". " + (row.summary or ""))[:512]
-        articles_data.append({"date": pub_date, "text": text_content, "score": float(row.sentiment_score or 0.5)})
+        pub_date = pd.Timestamp(row[0])
+        title = row[2] or ""
+        summary = row[3] or ""
+        score = float(row[1]) if row[1] is not None else 0.5
+        text_content = (title + ". " + summary)[:512]
+        articles_data.append({"date": pub_date, "text": text_content, "score": score})
 
     if tokenizer is not None and finbert_model is not None and pca is not None:
         # Full FinBERT → PCA pipeline
