@@ -667,6 +667,7 @@ CREATE INDEX IF NOT EXISTS idx_income_stmt_period_end ON edgar.income_statements
 CREATE INDEX IF NOT EXISTS idx_balance_sheet_period_end ON edgar.balance_sheets (period_end DESC);
 CREATE INDEX IF NOT EXISTS idx_cash_flow_period_end ON edgar.cash_flows (period_end DESC);
 CREATE INDEX IF NOT EXISTS idx_forecast_history_ticker_date ON forecast.forecast_history (ticker, forecast_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forecast_history_unique ON forecast.forecast_history (ticker, forecast_date, horizon_days);
 CREATE INDEX IF NOT EXISTS idx_financial_metrics_period ON market.financial_metrics (period_end, period_type);
 
 -- ======================= Grant search_path ===================================
