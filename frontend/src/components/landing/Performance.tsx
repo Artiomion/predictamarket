@@ -1,67 +1,36 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 
-// Numbers pulled from docs/ENSEMBLE_NOTES.md (3-model consensus study on the
-// post-Oct-2024 test window). Refresh after every retrain.
+// Numbers pulled from lib/model-metrics.ts (single source of truth — also
+// sourced by Strengths, ModelStrengthBanner, landing hero stats, Top Picks).
+//
+// Previous incarnation used a requestAnimationFrame count-up gated by an
+// IntersectionObserver. Both were fragile: observer missed fast scrolls,
+// RAF throttled in background tabs → users saw stuck-at-zero stats. The
+// numbers themselves are the product here; a cosmetic count-up isn't worth
+// that failure mode.
 const metrics = [
-  { end: 63, suffix: "%", label: "Consensus Win Rate", decimals: 0 },
-  { end: 19.2, suffix: "%", label: "Top-20 Return", decimals: 1 },
-  { end: 346, suffix: "", label: "S&P 500 Stocks", decimals: 0 },
-  { end: 107, suffix: "", label: "Data Signals", decimals: 0 },
+  {
+    value: `${MODEL_METRICS.conflong_win_rate_pct}%`,
+    label: "Consensus Win Rate",
+  },
+  {
+    value: `${MODEL_METRICS.top20_return_pct.toFixed(1)}%`,
+    label: "Top-20 Return",
+  },
+  {
+    value: String(MODEL_METRICS.n_tickers),
+    label: "S&P 500 Stocks",
+  },
+  {
+    value: String(MODEL_METRICS.n_features),
+    label: "Data Signals",
+  },
 ] as const
 
-function CountUp({ end, suffix, decimals, started }: { end: number; suffix: string; decimals: number; started: boolean }) {
-  const [value, setValue] = useState(0)
-  const rafRef = useRef<number>(0)
-
-  useEffect(() => {
-    if (!started) return
-    const duration = 1500
-    const startTime = performance.now()
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setValue(eased * end)
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate)
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [started, end])
-
-  return (
-    <span className="font-mono text-4xl font-medium tabular-nums md:text-5xl">
-      {value.toFixed(decimals)}{suffix}
-    </span>
-  )
-}
-
 export function Performance() {
-  const ref = useRef<HTMLDivElement>(null)
-  const [started, setStarted] = useState(false)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setStarted(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.3 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
   return (
     <section className="py-24 px-4">
       <div className="mx-auto max-w-6xl">
@@ -80,10 +49,7 @@ export function Performance() {
           </p>
         </motion.div>
 
-        <div
-          ref={ref}
-          className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-4"
-        >
+        <div className="mt-16 grid grid-cols-2 gap-8 md:grid-cols-4">
           {metrics.map((m, i) => (
             <motion.div
               key={m.label}
@@ -93,7 +59,9 @@ export function Performance() {
               transition={{ delay: i * 0.1, duration: 0.4, ease: "easeOut" }}
               className="text-center"
             >
-              <CountUp end={m.end} suffix={m.suffix} decimals={m.decimals} started={started} />
+              <span className="font-mono text-4xl font-medium tabular-nums md:text-5xl">
+                {m.value}
+              </span>
               <p className="mt-2 text-sm text-text-muted">{m.label}</p>
             </motion.div>
           ))}
