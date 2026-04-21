@@ -5,42 +5,42 @@ import { CheckCircle2, Info } from "lucide-react"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
 /**
- * Model-strength showcase — the things the ensemble is demonstrably good at.
- *
- * Each card is backed by the ep2+ep4+ep5 ensemble study on the post-Oct-2025
- * test window. Numbers come from lib/model-metrics.ts (single source of truth).
+ * Model-strength showcase — live targets as headlines, back-test numbers
+ * as secondary context. We publish realistic expected performance (after
+ * shrinkage for small-sample, overfitting, costs, regime shift) rather
+ * than raw back-test numbers that would not hold in production.
  */
 const strengths = [
   {
     title: `Relative ranking (${MODEL_METRICS.n_tickers} stocks)`,
-    metric: `Sharpe ${MODEL_METRICS.top20_sharpe.toFixed(2)}`,
-    detail: `The model's core competency. Top-20 daily rebalance returned ${MODEL_METRICS.top20_return_display} vs S&P 500's +${MODEL_METRICS.sp500_return_pct}% over ${MODEL_METRICS.test_trading_days} trading days — hedge-fund-grade risk-adjusted return.`,
+    metric: `Sharpe ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} live target`,
+    detail: `Top-20 daily-rebalance strategy targets hedge-fund-grade risk-adjusted return in live trading. Back-test on ${MODEL_METRICS.test_trading_days} trading days produced Sharpe ${MODEL_METRICS.backtest_top20_sharpe}; we shrink to ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} realistically after costs, overfitting, and regime shift.`,
   },
   {
     title: "3-model consensus filter",
-    metric: `${MODEL_METRICS.conflong_win_rate_pct}% win rate`,
-    detail: `When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price, the signal backtests at Sharpe ${MODEL_METRICS.conflong_sharpe} across ${MODEL_METRICS.conflong_n_trades} trades.`,
+    metric: `~${MODEL_METRICS.live_consensus_win_rate_pct}% win rate live`,
+    detail: `When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price. Back-test: ${MODEL_METRICS.backtest_consensus_win_rate_pct}% WR on ${MODEL_METRICS.backtest_consensus_n_trades} trades (small sample — expect ~${MODEL_METRICS.live_consensus_win_rate_pct}% in live trading).`,
   },
   {
     title: "1-month direction (up/down)",
-    metric: `${MODEL_METRICS.diracc_22d_pct}% accuracy`,
-    detail: `Ensemble DirAcc at 22-trading-day horizon is ${MODEL_METRICS.diracc_22d_pct}% across ${MODEL_METRICS.test_samples.toLocaleString()} test samples — ~34σ above a coin flip. Strong signal for "will this stock be higher or lower in a month".`,
+    metric: `~${MODEL_METRICS.live_diracc_22d_pct}% accuracy live`,
+    detail: `Directional accuracy at 22-trading-day horizon. Back-test on ${MODEL_METRICS.test_samples.toLocaleString()} samples produced ${MODEL_METRICS.backtest_diracc_22d_pct}%; realistic live estimate is ~${MODEL_METRICS.live_diracc_22d_pct}% after regime-shift and overfitting adjustments — still well above the 50% coin-flip baseline.`,
   },
   {
-    title: "Short-horizon MAPE (1-day)",
-    metric: `${MODEL_METRICS.mape_1d_pct}% error`,
+    title: "Short-horizon accuracy (1-day)",
+    metric: `${MODEL_METRICS.backtest_mape_1d_pct}% error (back-test)`,
     detail:
-      "Next-day price predictions are accurate within ~5% on average — usable for timing around earnings or event windows.",
+      "Next-day price predictions are accurate within ~5% on average in back-test — usable for timing around earnings or event windows. Like all metrics, expect some degradation in live trading.",
   },
   {
     title: "Top-20 vs S&P 500",
-    metric: `+${MODEL_METRICS.alpha_vs_sp500_pp}pp alpha`,
-    detail: `Ensemble Top-20 daily-rebalance portfolio outperformed the S&P 500 benchmark by ${MODEL_METRICS.alpha_vs_sp500_pp} percentage points over the same test window.`,
+    metric: `~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp alpha target`,
+    detail: `Expected outperformance vs buy-and-hold S&P 500 in live trading. Back-test showed +${MODEL_METRICS.backtest_alpha_vs_sp500_pp}pp on ${MODEL_METRICS.test_trading_days} days; we shrink to ~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp realistically.`,
   },
   {
     title: "Data coverage per forecast",
     metric: `${MODEL_METRICS.n_features} signals`,
-    detail: `Each prediction ingests ${MODEL_METRICS.n_features} features: OHLCV, 15 technicals, 27 SEC financials, 32-dim news-sentiment PCA, 15 macro inputs, earnings surprises, insider flow, and calendar events.`,
+    detail: `Each prediction ingests ${MODEL_METRICS.n_features} features: OHLCV, 15 technicals, 27 SEC financials, 32-dim news-sentiment PCA, 15 macro inputs, earnings surprises, insider flow, and calendar events. (Note: ~32 sentiment features don't make the model's top-20 importance list — the real signal comes from price, technicals, and financials.)`,
   },
 ]
 
@@ -59,9 +59,11 @@ export function Strengths() {
             What the Model Does Well
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-text-secondary md:text-base">
-            Six measurable strengths, backed by the ensemble back-test on the
-            post-Oct-2025 hold-out window. Every number here is reproducible
-            from the shipped checkpoints.
+            Six measurable strengths. Headline numbers are <strong>live-trading
+            targets</strong> — derived from back-test results then shrunk for
+            realistic degradation (transaction costs, overfitting, regime
+            shift). Back-test origin numbers are in the detail text. Every
+            number here is auditable against the shipped checkpoints.
           </p>
         </motion.div>
 
@@ -114,9 +116,11 @@ export function Strengths() {
             <strong className="text-text-secondary">How to use this:</strong>{" "}
             treat PredictaMarket as a ranking + conviction filter. Use the Top
             Picks list to source ideas, check Alpha Signals for the tightest
-            consensus, and validate with your own research. Back-test
-            performance on a single test window does not guarantee future
-            results. This is not investment advice.
+            consensus, and validate with your own research. Live-target Sharpe
+            of ~{MODEL_METRICS.live_top20_sharpe.toFixed(1)} matches hedge-fund
+            median on public equity — this is solid, not supernatural.
+            Back-test performance on a single test window does not guarantee
+            future results. This is not investment advice.
           </p>
         </motion.div>
       </div>

@@ -8,7 +8,7 @@ import "./globals.css";
 // description that Google indexes without a manual edit here.
 export const metadata: Metadata = {
   title: "PredictaMarket — AI Stock Predictions",
-  description: `AI-powered stock predictions for ${MODEL_METRICS.n_tickers} S&P 500 stocks. Temporal Fusion Transformer with 3-model ensemble consensus — ${MODEL_METRICS.conflong_win_rate_pct}% win rate on high-conviction signals.`,
+  description: `AI-powered stock predictions for ${MODEL_METRICS.n_tickers} S&P 500 stocks. Temporal Fusion Transformer with 3-model ensemble consensus — hedge-fund-grade Sharpe ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} target with honest live-trading estimates.`,
 };
 
 export default function RootLayout({

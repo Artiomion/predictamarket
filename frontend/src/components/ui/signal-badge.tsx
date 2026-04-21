@@ -57,9 +57,9 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
       {isHighConfidence && showWinRate && signal === "BUY" && (
         <span
           className="text-[10px] opacity-75"
-          title={`Consensus BUY back-test: ${MODEL_METRICS.conflong_win_rate_pct}% win rate on ${MODEL_METRICS.conflong_n_trades} trades (single test window)`}
+          title={`Live WR target ~${MODEL_METRICS.live_consensus_win_rate_pct}% (back-test: ${MODEL_METRICS.backtest_consensus_win_rate_pct}% on ${MODEL_METRICS.backtest_consensus_n_trades} trades, shrunk for small sample)`}
         >
-          {MODEL_METRICS.conflong_win_rate_pct}% WR
+          ~{MODEL_METRICS.live_consensus_win_rate_pct}% WR
         </span>
       )}
       {confidence && (

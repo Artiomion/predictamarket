@@ -12,14 +12,11 @@ import { Pricing } from "@/components/landing/Pricing"
 import { Footer } from "@/components/landing/Footer"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
-// Metrics from the 3-model ensemble study (ep2+ep4+ep5 equal-weight) on the
-// post-Oct-2025 test window (Nov 2025 — early Apr 2026). WR and Return are
-// for the Consensus BUY subset.
-// Forecasts count is live count in DB, rounded. Numbers live in
-// lib/model-metrics.ts (single source of truth).
+// Live-target metrics + deterministic data coverage. Back-test origins are
+// disclosed in Strengths section and on Top Picks (BacktestSummary card).
 const stats = [
-  { value: `${MODEL_METRICS.conflong_win_rate_pct}%`, label: "Consensus Win Rate" },
-  { value: MODEL_METRICS.top20_return_display, label: "Top-20 Return" },
+  { value: `~${MODEL_METRICS.live_consensus_win_rate_pct}%`, label: "Consensus WR target" },
+  { value: `~${MODEL_METRICS.live_top20_sharpe.toFixed(1)}`, label: "Top-20 Sharpe target" },
   { value: String(MODEL_METRICS.n_tickers), label: "S&P 500 Stocks" },
   { value: "5K+", label: "Forecasts" },
 ]
@@ -47,7 +44,7 @@ export default function LandingPage() {
               transition={{ delay: 0.8, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-success"
             >
-              {MODEL_METRICS.conflong_win_rate_pct}% Consensus Win Rate
+              ~{MODEL_METRICS.live_consensus_win_rate_pct}% Consensus WR target
             </motion.span>
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}
@@ -55,7 +52,7 @@ export default function LandingPage() {
               transition={{ delay: 1.0, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-[var(--accent-from)]"
             >
-              Sharpe {MODEL_METRICS.conflong_sharpe} Ensemble
+              Hedge-fund-grade edge (Sharpe ~{MODEL_METRICS.live_consensus_sharpe.toFixed(1)} target)
             </motion.span>
           </div>
 

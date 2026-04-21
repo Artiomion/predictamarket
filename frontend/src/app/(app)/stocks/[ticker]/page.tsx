@@ -167,8 +167,8 @@ export default function StockPage() {
                     aria-hidden="true"
                     className="inline-block size-1.5 rounded-full bg-success"
                   />
-                  Model · {MODEL_METRICS.diracc_22d_pct}% 1m DirAcc · Sharpe{" "}
-                  {MODEL_METRICS.top20_sharpe.toFixed(2)}
+                  Model · ~{MODEL_METRICS.live_diracc_22d_pct}% 1m DirAcc · Sharpe ~
+                  {MODEL_METRICS.live_top20_sharpe.toFixed(1)}
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   {METRIC_CAVEATS.ticker_chip}

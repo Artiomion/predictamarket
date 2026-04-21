@@ -3,22 +3,18 @@
 import { motion } from "framer-motion"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
-// Numbers pulled from lib/model-metrics.ts (single source of truth — also
-// sourced by Strengths, ModelStrengthBanner, landing hero stats, Top Picks).
-//
-// Previous incarnation used a requestAnimationFrame count-up gated by an
-// IntersectionObserver. Both were fragile: observer missed fast scrolls,
-// RAF throttled in background tabs → users saw stuck-at-zero stats. The
-// numbers themselves are the product here; a cosmetic count-up isn't worth
-// that failure mode.
+// Numbers pulled from lib/model-metrics.ts (single source of truth).
+// Headline shows live *targets* after realistic degradation. Back-test
+// context lives on the Top Picks page (BacktestSummary) for users who
+// want the raw numbers.
 const metrics = [
   {
-    value: `${MODEL_METRICS.conflong_win_rate_pct}%`,
-    label: "Consensus Win Rate",
+    value: `~${MODEL_METRICS.live_consensus_win_rate_pct}%`,
+    label: "Consensus Win Rate (live target)",
   },
   {
-    value: `${MODEL_METRICS.top20_return_pct.toFixed(1)}%`,
-    label: "Top-20 Return",
+    value: `~${MODEL_METRICS.live_top20_sharpe.toFixed(1)}`,
+    label: "Top-20 Sharpe (live target)",
   },
   {
     value: String(MODEL_METRICS.n_tickers),

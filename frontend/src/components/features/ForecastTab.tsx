@@ -217,7 +217,7 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
               </p>
               <p className="mt-1">
                 <strong className="text-text-primary">What to do:</strong> use the rank tier above
-                (that&apos;s the metric our ensemble is strong at — Sharpe {MODEL_METRICS.top20_sharpe.toFixed(2)}) and treat the
+                (that&apos;s the metric our ensemble is strong at — live Sharpe target ~{MODEL_METRICS.live_top20_sharpe.toFixed(1)}) and treat the
                 dollar median as &quot;approximate direction&quot;, not a price target.
               </p>
             </div>
@@ -404,9 +404,9 @@ function RankingContext({ rank, ticker }: { rank: RankInfo; ticker: string }) {
       <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
         <strong className="text-text-secondary">What this means:</strong> the model
         ranks {ticker} at position #{r1m} by predicted 1-month return — this is
-        the metric our ensemble is strongest at (Sharpe {MODEL_METRICS.top20_sharpe.toFixed(2)} on
-        Top-20 back-test). The dollar price forecast below is directional;
-        1-month median absolute error is ±{MODEL_METRICS.mape_22d_pct.toFixed(0)}%,
+        the metric our ensemble is strongest at (live Sharpe target ~{MODEL_METRICS.live_top20_sharpe.toFixed(1)}
+        on Top-20 rebalance). The dollar price forecast below is directional;
+        1-month median absolute error is ±{MODEL_METRICS.backtest_mape_22d_pct.toFixed(0)}%,
         so use rank tier for conviction, not the exact target price.
       </p>
     </div>

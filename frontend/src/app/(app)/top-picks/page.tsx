@@ -44,36 +44,34 @@ export default function TopPicksPage() {
             AI-ranked stocks with the highest predicted 1-month returns
           </p>
         </div>
-        {/* Hero callout — the headline metric for this page. Sharpe (from
-            MODEL_METRICS) is above the hedge-fund threshold (~1.0), so it
-            deserves prominence. Tooltip carries the caveat and is reachable
-            by touch + keyboard (not just desktop hover). */}
+        {/* Hero callout — live-target Sharpe is the primary number. Raw
+            back-test (1.45) is in the tooltip caveat for transparency. */}
         <Tooltip>
           <TooltipTrigger
             type="button"
-            aria-label={`Strategy Sharpe ${MODEL_METRICS.top20_sharpe.toFixed(2)}, back-test return ${MODEL_METRICS.top20_return_display}. ${METRIC_CAVEATS.top20_sharpe}`}
+            aria-label={`Target live Sharpe ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)}. ${METRIC_CAVEATS.live_sharpe}`}
             className="flex items-center gap-4 rounded-card border border-border-subtle bg-bg-surface px-4 py-3 text-left transition-colors hover:border-success/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
           >
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wider text-text-muted">
-                Strategy Sharpe
+                Live Sharpe target
               </p>
               <p className="font-mono text-2xl font-medium text-success tabular-nums">
-                {MODEL_METRICS.top20_sharpe.toFixed(2)}
+                ~{MODEL_METRICS.live_top20_sharpe.toFixed(1)}
               </p>
             </div>
             <div aria-hidden="true" className="h-8 w-px bg-border-subtle" />
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wider text-text-muted">
-                Back-test Return
+                Alpha vs S&P 500
               </p>
               <p className="font-mono text-2xl font-medium text-success tabular-nums">
-                {MODEL_METRICS.top20_return_display}
+                ~+{MODEL_METRICS.live_alpha_vs_sp500_pp}pp
               </p>
             </div>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
-            {METRIC_CAVEATS.top20_sharpe}
+            {METRIC_CAVEATS.live_sharpe}
           </TooltipContent>
         </Tooltip>
       </div>

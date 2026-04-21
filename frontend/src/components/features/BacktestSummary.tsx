@@ -21,22 +21,25 @@ const BACKTEST = {
   trading_days: MODEL_METRICS.test_trading_days,
   strategy: {
     name: "Top-20 Daily Rebalance",
-    return_pct: MODEL_METRICS.top20_return_pct,
-    sharpe: MODEL_METRICS.top20_sharpe,
+    return_pct: MODEL_METRICS.backtest_top20_return_pct,
+    sharpe: MODEL_METRICS.backtest_top20_sharpe,
+    live_sharpe_target: MODEL_METRICS.live_top20_sharpe,
     description:
       "Long top 20 tickers each day by predicted 1-day return, equal-weight, rebalanced at close.",
   },
   benchmark: {
     name: "S&P 500 Buy & Hold",
-    return_pct: MODEL_METRICS.sp500_return_pct,
-    sharpe: 0.8,   // not in MODEL_METRICS yet — add if we make a benchmark tab
+    return_pct: MODEL_METRICS.backtest_sp500_return_pct,
+    sharpe: 0.8,
     description: "Passive long position over the same window.",
   },
   consensus: {
     name: "Consensus BUY Only",
-    sharpe: MODEL_METRICS.conflong_sharpe,
-    win_rate: MODEL_METRICS.conflong_win_rate_pct,
-    trades: MODEL_METRICS.conflong_n_trades,
+    sharpe: MODEL_METRICS.backtest_consensus_sharpe,
+    win_rate: MODEL_METRICS.backtest_consensus_win_rate_pct,
+    trades: MODEL_METRICS.backtest_consensus_n_trades,
+    live_sharpe_target: MODEL_METRICS.live_consensus_sharpe,
+    live_win_rate_target: MODEL_METRICS.live_consensus_win_rate_pct,
     description:
       "Long only when all 3 ensemble models place the 80% CI lower bound above current close.",
   },
