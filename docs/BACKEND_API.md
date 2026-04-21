@@ -216,7 +216,7 @@ Update profile. Body: `{ "name": "New Name" }`
 **Base:** `/api/market`
 
 ### `GET /api/market/instruments`
-List all 94 S&P 500 tickers.
+List all 346 S&P 500 tickers.
 
 **Query params:**
 | Param | Type | Default | Description |
@@ -767,7 +767,7 @@ All errors return:
 ### Signal & Confidence Colors
 
 ```
-BUY  + HIGH   → #00FF88 (bright green) + badge "99.5% WR"
+BUY  + HIGH   → #00FF88 (bright green) + badge "63% WR" (ensemble ConfLong backtest)
 BUY  + MEDIUM → #00FF88 (green)
 SELL + HIGH   → #FF3366 (bright red)
 SELL + MEDIUM → #FF3366 (red)
@@ -801,4 +801,4 @@ Use for drawing the forecast line on the TradingView chart overlay.
 
 ### 94 Supported Tickers
 
-The platform supports exactly **94 S&P 500 tickers** that were in the TFT model's training set. File: `models/old_model_sp500_tickers.txt`. Any ticker not in this set returns `404`.
+The platform supports exactly **346 S&P 500 tickers** that were in the TFT model's training set. File: `models/old_model_sp500_tickers.txt`. Any ticker not in this set returns `404`.

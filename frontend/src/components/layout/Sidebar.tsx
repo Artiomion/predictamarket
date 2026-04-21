@@ -12,6 +12,7 @@ import {
   Newspaper,
   CalendarDays,
   Bell,
+  Zap,
   PanelLeftClose,
   PanelLeftOpen,
   X,
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/top-picks", label: "Top Picks", icon: TrendingUp },
+  { href: "/alpha-signals", label: "Alpha Signals", icon: Zap, badge: "Pro" },
   { href: "/stocks", label: "Stocks", icon: BarChart3 },
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/watchlist", label: "Watchlist", icon: Star },
@@ -52,19 +54,17 @@ export function Sidebar({ mobileOpen, onMobileClose, collapsed, onCollapsedChang
           <span className="flex size-8 shrink-0 items-center justify-center rounded-button bg-gradient-to-br from-accent-from to-accent-to font-heading text-sm font-bold text-bg-primary">
             PM
           </span>
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-                className="overflow-hidden whitespace-nowrap font-heading text-base font-semibold"
-              >
-                PredictaMarket
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {!collapsed && (
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: "easeOut" }}
+              className="whitespace-nowrap font-heading text-base font-semibold"
+            >
+              PredictaMarket
+            </motion.span>
+          )}
         </Link>
       </div>
 
@@ -94,19 +94,26 @@ export function Sidebar({ mobileOpen, onMobileClose, collapsed, onCollapsedChang
                 />
               )}
               <Icon className="size-4 shrink-0" />
-              <AnimatePresence>
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: "auto" }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                    className="overflow-hidden whitespace-nowrap text-ellipsis"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              {/* Animating `width` on every label caused first-paint truncation
+                  ("Dash", "Alpha Sig", "Sto") because the motion.span started
+                  at width:0 and lazily expanded. Opacity-only animation keeps
+                  labels at natural width immediately so text never clips. */}
+              {!collapsed && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.12, ease: "easeOut" }}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 whitespace-nowrap"
+                >
+                  <span className="truncate">{item.label}</span>
+                  {"badge" in item && item.badge && (
+                    <span className="shrink-0 rounded-full bg-gradient-to-r from-[var(--accent-from)] to-[var(--accent-to)] px-1.5 py-px text-[9px] font-semibold leading-none text-bg-primary">
+                      {item.badge}
+                    </span>
+                  )}
+                </motion.span>
+              )}
             </Link>
           )
         })}

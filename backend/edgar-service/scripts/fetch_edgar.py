@@ -55,6 +55,9 @@ INCOME_FIELDS = {
     "CommonStockSharesOutstanding": "shares_outstanding",
 }
 
+# NOTE: dict insertion order is significant — _extract_facts iterates tags in
+# order and the first match per period_end wins. Put primary concepts first,
+# fallbacks after. (Python 3.7+ guarantees insertion-order dict iteration.)
 BALANCE_FIELDS = {
     "Assets": "total_assets",
     "Liabilities": "total_liabilities",
@@ -67,6 +70,18 @@ BALANCE_FIELDS = {
     "LiabilitiesCurrent": "current_liabilities",
     "PropertyPlantAndEquipmentNet": "property_plant_equipment",
     "RetainedEarningsAccumulatedDeficit": "retained_earnings",
+    # Path B extensions — required by TFT feature names.
+    # Multiple XBRL tags can target the same column — first-insertion wins in
+    # _extract_facts, so primary concepts are listed before fallbacks.
+    "CommonStockValue": "common_stock_value",
+    # Apple / Microsoft fallback — par value + APIC combined line.
+    "CommonStocksIncludingAdditionalPaidInCapital": "common_stock_value",
+    "AccountsPayableCurrent": "accounts_payable_current",
+    # Banks sometimes report just "AccountsReceivableNet" without Current suffix.
+    "AccountsReceivableNetCurrent": "accounts_receivable_net_current",
+    "AccountsReceivableNet": "accounts_receivable_net_current",
+    "InventoryNet": "inventory_net",
+    "CommonStockDividendsPerShareDeclared": "dividends_per_share_declared",
 }
 
 CASHFLOW_FIELDS = {
@@ -75,8 +90,18 @@ CASHFLOW_FIELDS = {
     "NetCashProvidedByUsedInFinancingActivities": "financing_cash_flow",
     "PaymentsToAcquirePropertyPlantAndEquipment": "capital_expenditures",
     "PaymentsOfDividends": "dividends_paid",
-    "PaymentsOfDividendsCommonStock": "dividends_paid",
+    "PaymentsOfDividendsCommonStock": "dividends_common_stock_cash",  # keep distinct col
     "PaymentsForRepurchaseOfCommonStock": "stock_repurchases",
+    # Path B extensions — share-based comp, buyback programs, asset divestiture.
+    "ProceedsFromSaleOfPropertyPlantAndEquipment": "proceeds_from_sale_of_ppe",
+    "StockIssuedDuringPeriodValueShareBasedCompensation": "stock_issued_sbc_value",
+    # Fallback: most tech companies use ShareBasedCompensation as the consolidated line.
+    "ShareBasedCompensation": "stock_issued_sbc_value",
+    "AdjustmentsToAdditionalPaidInCapitalSharebasedCompensationRequisiteServicePeriodRecognitionValue": "stock_issued_sbc_value",
+    "StockIssuedDuringPeriodSharesShareBasedCompensation": "stock_issued_sbc_shares",
+    "PaymentsRelatedToTaxWithholdingForShareBasedCompensation": "payments_tax_withholding_sbc",
+    "StockRepurchaseProgramAuthorizedAmount1": "stock_repurchase_authorized_amount",
+    "StockRepurchaseProgramRemainingAuthorizedRepurchaseAmount1": "stock_repurchase_remaining_amount",
 }
 
 
@@ -170,22 +195,36 @@ async def process_ticker(
         filing_id = filing.id
         counts["filings"] = 1
 
-    # Parse annual (10-K)
+    # Parse annual (10-K) and quarterly (10-Q). UPSERT behaviour: if a row
+    # already exists for (ticker, period_end), update NULL columns with new
+    # values. This is critical for Path B — existing rows from previous scrapes
+    # lack the new XBRL concepts (CommonStockValue, InventoryNet, etc.) and
+    # must be back-filled without losing the 10 old columns.
+    from sqlalchemy import update as _update
+
     for form, period_label in [("10-K", "annual"), ("10-Q", "quarterly")]:
         income_data = _extract_facts(facts, INCOME_FIELDS, form_filter=form)
-        for period_end, values in sorted(income_data.items())[-8:]:  # Last 8 periods
+        for period_end, values in sorted(income_data.items())[-8:]:
             existing = await session.execute(
                 select(IncomeStatement.id).where(
                     IncomeStatement.ticker == ticker,
                     IncomeStatement.period_end == period_end,
                 ).limit(1)
             )
-            if existing.scalar_one_or_none():
-                continue
-            session.add(IncomeStatement(
-                filing_id=filing_id, ticker=ticker, period_end=period_end, **values,
-            ))
-            counts["income"] += 1
+            eid = existing.scalar_one_or_none()
+            # Filter None/NaN so UPDATE doesn't clobber columns that the current
+            # XBRL response didn't include with NULLs (partial taxonomy response).
+            clean = {k: v for k, v in values.items() if v is not None and v == v}
+            if eid:
+                if clean:
+                    await session.execute(
+                        _update(IncomeStatement).where(IncomeStatement.id == eid).values(**clean)
+                    )
+            else:
+                session.add(IncomeStatement(
+                    filing_id=filing_id, ticker=ticker, period_end=period_end, **clean,
+                ))
+                counts["income"] += 1
 
         balance_data = _extract_facts(facts, BALANCE_FIELDS, form_filter=form)
         for period_end, values in sorted(balance_data.items())[-8:]:
@@ -195,16 +234,21 @@ async def process_ticker(
                     BalanceSheet.period_end == period_end,
                 ).limit(1)
             )
-            if existing.scalar_one_or_none():
-                continue
-            session.add(BalanceSheet(
-                filing_id=filing_id, ticker=ticker, period_end=period_end, **values,
-            ))
-            counts["balance"] += 1
+            eid = existing.scalar_one_or_none()
+            clean = {k: v for k, v in values.items() if v is not None and v == v}
+            if eid:
+                if clean:
+                    await session.execute(
+                        _update(BalanceSheet).where(BalanceSheet.id == eid).values(**clean)
+                    )
+            else:
+                session.add(BalanceSheet(
+                    filing_id=filing_id, ticker=ticker, period_end=period_end, **clean,
+                ))
+                counts["balance"] += 1
 
         cf_data = _extract_facts(facts, CASHFLOW_FIELDS, form_filter=form)
         for period_end, values in sorted(cf_data.items())[-8:]:
-            # Compute free_cash_flow if we have operating and capex
             if "operating_cash_flow" in values and "capital_expenditures" in values:
                 values["free_cash_flow"] = values["operating_cash_flow"] - abs(values["capital_expenditures"])
             existing = await session.execute(
@@ -213,12 +257,18 @@ async def process_ticker(
                     CashFlow.period_end == period_end,
                 ).limit(1)
             )
-            if existing.scalar_one_or_none():
-                continue
-            session.add(CashFlow(
-                filing_id=filing_id, ticker=ticker, period_end=period_end, **values,
-            ))
-            counts["cashflow"] += 1
+            eid = existing.scalar_one_or_none()
+            clean = {k: v for k, v in values.items() if v is not None and v == v}
+            if eid:
+                if clean:
+                    await session.execute(
+                        _update(CashFlow).where(CashFlow.id == eid).values(**clean)
+                    )
+            else:
+                session.add(CashFlow(
+                    filing_id=filing_id, ticker=ticker, period_end=period_end, **clean,
+                ))
+                counts["cashflow"] += 1
 
     return counts
 

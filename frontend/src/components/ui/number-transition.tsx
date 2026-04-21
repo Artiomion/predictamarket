@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useMotionValue, useTransform, animate, motion } from "framer-motion"
+import { useMotionValue, useTransform, animate } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface NumberTransitionProps {

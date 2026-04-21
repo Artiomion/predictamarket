@@ -9,6 +9,7 @@ import type {
   PriceBar,
   Forecast,
   TopPick,
+  AlphaSignal,
   Portfolio,
   Position,
   SectorAllocation,
@@ -234,6 +235,8 @@ export const forecastApi = {
     api.post("/api/forecast/batch", { tickers }),
   getBatchStatus: (jobId: string) =>
     api.get(`/api/forecast/batch/${jobId}`),
+  getAlphaSignals: (params?: { limit?: number; confident_only?: boolean }) =>
+    api.get<AlphaSignal[]>("/api/forecast/alpha-signals", { params }),
 }
 
 // ── Portfolio API ────────────────────────────────────

@@ -41,7 +41,17 @@ async def get_or_create_model_version(session: AsyncSession, checkpoint_name: st
         version=version,
         checkpoint_path=f"models/{checkpoint_name}" if checkpoint_name else "unknown",
         is_active=True,
-        metrics={"mape_1d": 6.1, "win_rate": 99.5},
+        # Metrics from the 3-model ensemble (ep2+ep4+ep5 equal-weight) study
+        # on the post-Oct-2024 test window — see docs/ENSEMBLE_NOTES.md.
+        metrics={
+            "mape_1d": 4.78,
+            "mape_22d": 12.49,
+            "top20_sharpe": 1.45,
+            "top20_return_pct": 19.19,
+            "conflong_sharpe": 8.15,
+            "conflong_win_rate": 63.0,
+            "conflong_n_trades": 27,
+        },
     )
     session.add(mv)
     await session.flush()
@@ -195,6 +205,9 @@ async def get_forecast_history(session: AsyncSession, ticker: str, limit: int = 
 
 
 async def get_top_picks(session: AsyncSession, limit: int = 20) -> list[dict]:
+    # "Top Picks" must only show actionable, positive-expected-return BUYs.
+    # Mixing -1.75% returns under the "1m Return" column looked broken even
+    # though the sort was correct — users expect every row to be positive.
     result = await session.execute(
         select(Forecast, Instrument.name)
         .join(Instrument, Forecast.instrument_id == Instrument.id)
@@ -202,6 +215,7 @@ async def get_top_picks(session: AsyncSession, limit: int = 20) -> list[dict]:
             Forecast.is_latest.is_(True),
             Forecast.signal == "BUY",
             Forecast.predicted_return_1m.isnot(None),
+            Forecast.predicted_return_1m > 0,
         )
         .order_by(Forecast.predicted_return_1m.desc())
         .limit(limit)

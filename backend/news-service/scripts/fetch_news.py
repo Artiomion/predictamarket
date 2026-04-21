@@ -73,19 +73,44 @@ RSS_FEEDS: list[dict[str, str]] = [
     {"name": "Seeking Alpha", "url": "https://seekingalpha.com/market_currents.xml"},
 ]
 
-# Yahoo Finance RSS per-ticker feeds for all 94 S&P 500 tickers in our model
-TICKER_RSS_TICKERS = [
-    "AAPL", "ABT", "ACGL", "CHD", "CHRW", "CMS", "CNP", "COF", "COHR", "COO",
-    "COP", "COR", "COST", "CPB", "CPRT", "CPT", "CRH", "CSGP", "CSX", "CTAS",
-    "CTRA", "CTSH", "CVX", "DD", "DE", "DECK", "DGX", "DHI", "DHR", "DIS",
-    "DLTR", "DOC", "DOV", "DRI", "EBAY", "EVRG", "EXC", "FAST", "FFIV", "FICO",
-    "FITB", "FIX", "FRT", "GE", "GEN", "GILD", "GIS", "GL", "GLW", "GPC",
-    "GS", "GWW", "HAL", "HAS", "HBAN", "HOLX", "HRL", "LEN", "LH", "LHX",
-    "LII", "LIN", "LLY", "LMT", "LNT", "LOW", "LRCX", "LUV", "MNST", "MOS",
-    "MRK", "MS", "MSFT", "MSI", "MTB", "MTD", "MU", "NDSN", "NEE", "NEM",
-    "NKE", "NOC", "NSC", "NTAP", "NTRS", "NUE", "NVDA", "NVR", "ODFL", "OKE",
-    "ORCL", "ORLY", "OXY", "PAYX", "ZBRA",
-]
+# Yahoo Finance RSS per-ticker feeds for ALL supported S&P 500 tickers.
+# Single source of truth: /models/old_model_sp500_tickers.txt (same file
+# forecast-service uses for valid_tickers). Loaded lazily at first call so
+# import-time failures surface only when fetch_news actually runs, and the
+# ticker file is re-read on restart (no stale module-level cache across deploys).
+import os as _os
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def _load_ticker_rss_list() -> list[str]:
+    """Load ticker list from the models volume; raise loudly if missing.
+
+    Silent fallback to a tiny hardcoded list is worse than failing fast:
+    prod would quietly provide news for 10 tickers instead of 346 and look healthy.
+    """
+    ticker_file = Path(_os.environ.get("MODELS_DIR", "/models")) / "old_model_sp500_tickers.txt"
+    try:
+        tickers = [
+            t.strip().upper()
+            for t in ticker_file.read_text().splitlines()
+            if t.strip()
+        ]
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Ticker list not found at {ticker_file}. Ensure news-service has "
+            f"./models mounted read-only (see docker-compose.yml)."
+        ) from exc
+    if len(tickers) < 50:
+        raise RuntimeError(
+            f"Ticker list at {ticker_file} contains only {len(tickers)} entries — "
+            f"expected ~346. Mounted volume may be stale or truncated."
+        )
+    return tickers
+
+
+def _ticker_rss_list() -> list[str]:
+    return _load_ticker_rss_list()
 
 
 class TickerMatcher:
@@ -116,6 +141,10 @@ class TickerMatcher:
 
     def set_id_map(self, ticker_to_id: dict[str, str]) -> None:
         self._ticker_to_id = ticker_to_id
+
+    def get_id(self, ticker: str) -> str | None:
+        """Return instrument_id for a ticker if it's a known, active instrument."""
+        return self._ticker_to_id.get(ticker)
 
     def match(self, title: str, summary: str | None = None) -> list[tuple[str, str]]:
         """Match tickers in title (primary) and summary (secondary). Returns [(ticker, inst_id)]."""
@@ -208,6 +237,11 @@ def _parse_feed_entries(feed_cfg: dict, feed, seen_urls: set) -> list[dict]:
             "source": feed_cfg["name"],
             "published_at": published,
             "summary": clean_summary,
+            # If this article came from a per-ticker feed (Yahoo ?s=TICKER),
+            # carry the ticker so we can auto-tag it — the text matcher alone
+            # misses 2-char tickers (BK, CF, CI, GE, ON) which are excluded
+            # from the safe regex to avoid false positives in free text.
+            "source_ticker": feed_cfg.get("source_ticker"),
         })
     return entries
 
@@ -227,9 +261,15 @@ async def fetch_rss_entries() -> list[dict]:
         except Exception as exc:
             await logger.aerror("rss_fetch_error", feed=feed_cfg["name"], error=str(exc))
 
-    # 2. Ticker-specific feeds (Yahoo Finance per-ticker RSS)
-    for ticker in TICKER_RSS_TICKERS:
-        feed_cfg = {"name": f"Yahoo {ticker}", "url": f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"}
+    # 2. Ticker-specific feeds (Yahoo Finance per-ticker RSS) — auto-tagged
+    # with source_ticker so the matcher can attach them even when the text
+    # match would fail (short tickers, foreign names, etc.).
+    for ticker in _ticker_rss_list():
+        feed_cfg = {
+            "name": f"Yahoo {ticker}",
+            "url": f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US",
+            "source_ticker": ticker,
+        }
         try:
             feed = await asyncio.to_thread(
                 feedparser.parse, feed_cfg["url"],
@@ -265,11 +305,30 @@ async def process_and_store(entries: list[dict]) -> dict[str, int]:
     texts = [e["title"] + (". " + e["summary"] if e["summary"] else "") for e in new_entries]
     sentiments = await finbert.predict_batch(texts)
 
+    # 32-dim PCA vectors — consumed by forecast-service as `sent_0..sent_31`.
+    # If PCA artifact missing, pca_vectors has 768d raw embeddings (caller can still use sent_0).
+    try:
+        pca_vectors = await finbert.embed_batch(texts)
+    except Exception as exc:
+        await logger.awarning("pca_embed_failed", error=str(exc), count=len(texts))
+        import numpy as _np
+        pca_vectors = _np.zeros((len(texts), 32), dtype=_np.float32)
+
     high_impact_count = 0
     async with async_session_factory() as session:
-        for entry, sentiment in zip(new_entries, sentiments):
+        for idx, (entry, sentiment) in enumerate(zip(new_entries, sentiments)):
             matched = matcher.match(entry["title"], entry["summary"])
+
+            # Auto-tag from per-ticker feed — covers short/ambiguous tickers
+            # (BK, CF, CI, GE, ON, NWS) that the text matcher skips.
+            src_ticker = entry.get("source_ticker")
+            if src_ticker and not any(t == src_ticker for t, _ in matched):
+                inst_id = matcher.get_id(src_ticker)
+                if inst_id:
+                    matched = list(matched) + [(src_ticker, inst_id)]
+
             impact = determine_impact(sentiment, matched)
+            pca_vec = pca_vectors[idx].tolist() if idx < len(pca_vectors) else None
 
             article = Article(
                 title=entry["title"],
@@ -292,6 +351,7 @@ async def process_and_store(entries: list[dict]) -> dict[str, int]:
                     ticker=ticker,
                     sentiment_score=sentiment.score,
                     sentiment_label=sentiment.label,
+                    pca_vector=pca_vec,
                 ))
 
             if impact == "high":

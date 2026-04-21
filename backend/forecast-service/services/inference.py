@@ -401,34 +401,48 @@ def _extract_variable_importance(tft_model, infer_dl, config, signal, current_cl
     ]
 
 
-# ── Main inference ───────────────────────────────────────────────────────────
+# ── Feature assembly (shared between single-model and ensemble paths) ────────
 
-def _run_inference_sync(ticker: str, artifacts) -> dict:
-    """Full inference: DB prices + DB macro + RSS sentiment → TFT predict."""
-    artifacts.ensure_loaded()
+# Macro/table/event columns that are filled with zero if missing from DB.
+# Kept as module constant so both inference + ensemble use the same contract.
+_ZERO_FILL_EVENT_COLS = (
+    "eps_surprise_pct", "earnings_beat", "earnings_miss", "has_earnings",
+    "days_since_earnings", "insider_buys", "insider_sells", "insider_net",
+    "cpi", "unemployment", "fed_funds_rate", "yield_curve_spread",
+    "m2_money_supply", "wti_crude", "fred_vix",
+    "days_to_fomc", "is_options_expiration", "is_quad_witching",
+)
 
-    config = artifacts.config
-    dataset_params = artifacts.dataset_params
-    tft_model = artifacts.tft_model
-    pca = artifacts.pca
+
+def build_feature_df(
+    ticker: str,
+    config: dict,
+    finbert_tokenizer=None,
+    finbert_model=None,
+    pca=None,
+    augment: bool = True,
+) -> pd.DataFrame | None:
+    """Assemble the feature DataFrame for TFT inference.
+
+    Pulls OHLCV + macro + news sentiment from Postgres (backfilled by
+    `_fetch_price_data_sync` + `_fetch_macro_data_sync`), appends all
+    engineered features required by the model, sets categoricals & time_idx.
+
+    Returns None if there's not enough data (<max_encoder_length rows).
+    Returns an 82-row (encoder+prediction) DataFrame ready for
+    TimeSeriesDataSet.from_parameters(..., predict=True).
+    """
     n_components = config.get("n_sentiment_components", 32)
 
-    t0 = time.time()
-
-    # 1. Prices from DB
     prices = _fetch_price_data_sync(ticker)
     if prices is None or len(prices) < config["max_encoder_length"]:
-        return {"error": f"Not enough price data for {ticker}. Run update_prices.py first."}
+        return None
 
-    # 2. Macro from DB
     macro = _fetch_macro_data_sync()
-
-    # 3. News sentiment (RSS is lightweight, not rate-limited)
     sentiment = _fetch_news_sentiment_sync(
-        ticker, artifacts.finbert_tokenizer, artifacts.finbert_model, pca, n_components
+        ticker, finbert_tokenizer, finbert_model, pca, n_components
     )
 
-    # 4. Assemble DataFrame
     df = prices.copy()
 
     if macro is not None:
@@ -442,7 +456,6 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
         sentiment["Date"] = pd.to_datetime(sentiment["Date"])
         df = df.merge(sentiment, on="Date", how="left")
 
-    # Fill all required columns
     for col in config["time_varying_unknown_reals"]:
         if col not in df.columns:
             df[col] = 0.0
@@ -453,11 +466,7 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
         if col not in df.columns:
             df[col] = 0.0
 
-    for col in ["eps_surprise_pct", "earnings_beat", "earnings_miss", "has_earnings",
-                 "days_since_earnings", "insider_buys", "insider_sells", "insider_net",
-                 "cpi", "unemployment", "fed_funds_rate", "yield_curve_spread",
-                 "m2_money_supply", "wti_crude", "fred_vix",
-                 "days_to_fomc", "is_options_expiration", "is_quad_witching"]:
+    for col in _ZERO_FILL_EVENT_COLS:
         if col not in df.columns:
             df[col] = 0.0
 
@@ -473,9 +482,7 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
     df["day_of_week"] = df["Date"].dt.dayofweek.astype(str)
     df["month"] = df["Date"].dt.month.astype(str)
 
-    # time_idx must continue from training data sequence.
-    # Training: 2000-03-14 to 2024-10-31, ~6428 trading days (time_idx 0..6427).
-    # Live data continues from 6428+.
+    # time_idx must continue from training sequence (2000-03-14 = 0).
     first_date = df["Date"].iloc[0]
     offset = len(pd.bdate_range(_TRAIN_START, first_date)) - 1
     df["time_idx"] = range(offset, offset + len(df))
@@ -487,17 +494,62 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
 
     needed = config["max_encoder_length"] + config["max_prediction_length"]
     df = df.tail(needed).reset_index(drop=True)
-    # Preserve time_idx values (don't reset to 0)
     time_idx_start = df["time_idx"].iloc[0]
     df["time_idx"] = range(time_idx_start, time_idx_start + len(df))
+
+    # Augment with earnings / insider / SEC / sentiment PCA / FRED / calendar.
+    # Without this, ~77/107 features would be zero and predictions go OOD.
+    if augment:
+        from .features import augment_features
+        df = augment_features(df, ticker, n_sentiment=config.get("n_sentiment_components", 32))
+
+        # Re-ensure categoricals are strings and all config features exist
+        for col in config["static_categoricals"] + config["time_varying_known_categoricals"]:
+            if col in df.columns:
+                df[col] = df[col].astype(str)
+        for col in config["time_varying_unknown_reals"]:
+            if col not in df.columns:
+                df[col] = 0.0
+            else:
+                df[col] = df[col].fillna(0.0).astype(float)
+
+    return df
+
+
+# ── Main inference ───────────────────────────────────────────────────────────
+
+def _run_inference_sync(ticker: str, artifacts) -> dict:
+    """Full inference: DB prices + DB macro + DB sentiment → TFT predict."""
+    artifacts.ensure_loaded()
+
+    config = artifacts.config
+    dataset_params = artifacts.dataset_params
+    tft_model = artifacts.tft_model
+
+    t0 = time.time()
+
+    df = build_feature_df(
+        ticker, config,
+        finbert_tokenizer=artifacts.finbert_tokenizer,
+        finbert_model=artifacts.finbert_model,
+        pca=artifacts.pca,
+    )
+    if df is None:
+        return {"error": f"Not enough price data for {ticker}. Run update_prices.py first."}
+
+    # Count sentiment rows for response meta (rebuild from df — 'news_count' col was filled)
+    news_rows_used = int((df.get("news_count", pd.Series([0] * len(df))) > 0).sum())
 
     # 5. Predict
     try:
         from pytorch_forecasting import TimeSeriesDataSet
 
-        train_stub = df.head(config["max_encoder_length"]).copy()
-        training_ds = TimeSeriesDataSet.from_parameters(dataset_params, train_stub)
-        infer_ds = TimeSeriesDataSet.from_dataset(training_ds, df, predict=True, stop_randomization=True)
+        # Build inference dataset directly from full 82-row df (encoder+prediction).
+        # Earlier two-step from_dataset approach fails on new model because
+        # `from_parameters(stub_60_rows)` needs stub_len >= encoder+prediction.
+        infer_ds = TimeSeriesDataSet.from_parameters(
+            dataset_params, df, predict=True, stop_randomization=True,
+        )
         infer_dl = infer_ds.to_dataloader(train=False, batch_size=1, num_workers=0)
 
         # Use direct forward pass instead of predict() — Lightning's predict()
@@ -567,7 +619,7 @@ def _run_inference_sync(ticker: str, artifacts) -> dict:
         "predicted_return_1d": predicted_return_1d,
         "predicted_return_1w": predicted_return_1w,
         "predicted_return_1m": predicted_return_1m,
-        "news_articles_used": len(sentiment) if isinstance(sentiment, pd.DataFrame) and len(sentiment) > 0 else 0,
+        "news_articles_used": news_rows_used,
     })
 
 

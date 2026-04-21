@@ -1,9 +1,12 @@
 """Admin endpoints for triggering batch forecast (Airflow DAGs)."""
 
+import json
+
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from shared.internal_auth import require_internal_key
+from shared.redis_client import redis_client
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -38,3 +41,36 @@ async def evaluate_forecasts_endpoint(
     from services.evaluation import evaluate_forecasts
     result = await evaluate_forecasts(days_back=30)
     return {"status": "completed", **result}
+
+
+@router.post("/admin/run-alpha-signals", status_code=202)
+async def run_alpha_signals(
+    bg: BackgroundTasks,
+    _key: str = Depends(require_internal_key),
+):
+    """Trigger 3-model ensemble inference for all tickers (background).
+
+    Progress is published to Redis `alpha_signals:status`. Poll via
+    `GET /admin/alpha-signals-status`.
+    """
+    from scripts.run_alpha_signals import main
+    bg.add_task(_run_script, "run_alpha_signals", main)
+    return {"status": "accepted", "task": "run_alpha_signals"}
+
+
+@router.get("/admin/alpha-signals-status")
+async def alpha_signals_status(
+    _key: str = Depends(require_internal_key),
+) -> dict:
+    """Return current batch status: {phase: running|done|idle, done, failed, ...}.
+
+    Used by Airflow DAG to poll until phase=done. Returns phase=idle if no
+    recent run (key expired or never set).
+    """
+    raw = await redis_client.get("alpha_signals:status")
+    if not raw:
+        return {"phase": "idle"}
+    try:
+        return json.loads(raw if isinstance(raw, str) else raw.decode())
+    except (json.JSONDecodeError, AttributeError):
+        return {"phase": "idle"}

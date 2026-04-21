@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 
+// Numbers pulled from docs/ENSEMBLE_NOTES.md (3-model consensus study on the
+// post-Oct-2024 test window). Refresh after every retrain.
 const metrics = [
-  { end: 99.5, suffix: "%", label: "Win Rate", decimals: 1 },
-  { end: 77.7, suffix: "%", label: "Avg Return", decimals: 1 },
-  { end: 94, suffix: "", label: "S&P 500 Stocks", decimals: 0 },
+  { end: 63, suffix: "%", label: "Consensus Win Rate", decimals: 0 },
+  { end: 19.2, suffix: "%", label: "Top-20 Return", decimals: 1 },
+  { end: 346, suffix: "", label: "S&P 500 Stocks", decimals: 0 },
   { end: 107, suffix: "", label: "Data Signals", decimals: 0 },
 ] as const
 

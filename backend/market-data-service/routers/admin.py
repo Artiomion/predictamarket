@@ -71,3 +71,19 @@ async def update_insider(
     from scripts.update_insider import main
     bg.add_task(_run_script, "update_insider", main)
     return {"status": "accepted", "task": "update_insider"}
+
+
+@router.post("/admin/update-fred", status_code=202)
+async def update_fred(
+    bg: BackgroundTasks,
+    _key: str = Depends(require_internal_key),
+):
+    """Trigger FRED macro series update (7 series, daily).
+
+    Fetches CPI, unemployment, fed funds rate, 10Y-2Y spread, M2, WTI, VIXCLS
+    and upserts into market.macro_history. Forward-fills monthly series across
+    daily dates so the TFT feature pipeline sees a populated row per trading day.
+    """
+    from scripts.update_fred import main
+    bg.add_task(_run_script, "update_fred", main)
+    return {"status": "accepted", "task": "update_fred"}

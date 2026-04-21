@@ -62,6 +62,12 @@ class BalanceSheet(BaseModel):
     current_liabilities: Mapped[float | None] = mapped_column(Double)
     property_plant_equipment: Mapped[float | None] = mapped_column(Double)
     retained_earnings: Mapped[float | None] = mapped_column(Double)
+    # Path B extensions — XBRL concepts required by the TFT feature set.
+    common_stock_value: Mapped[float | None] = mapped_column(Double)
+    accounts_payable_current: Mapped[float | None] = mapped_column(Double)
+    accounts_receivable_net_current: Mapped[float | None] = mapped_column(Double)
+    inventory_net: Mapped[float | None] = mapped_column(Double)
+    dividends_per_share_declared: Mapped[float | None] = mapped_column(Double)
 
     filing: Mapped["Filing"] = relationship(back_populates="balance_sheets")
 
@@ -80,5 +86,13 @@ class CashFlow(BaseModel):
     free_cash_flow: Mapped[float | None] = mapped_column(Double)
     dividends_paid: Mapped[float | None] = mapped_column(Double)
     stock_repurchases: Mapped[float | None] = mapped_column(Double)
+    # Path B extensions — additional XBRL concepts (SBC, buyback programs, etc.)
+    proceeds_from_sale_of_ppe: Mapped[float | None] = mapped_column(Double)
+    stock_issued_sbc_value: Mapped[float | None] = mapped_column(Double)
+    stock_issued_sbc_shares: Mapped[float | None] = mapped_column(Double)
+    payments_tax_withholding_sbc: Mapped[float | None] = mapped_column(Double)
+    dividends_common_stock_cash: Mapped[float | None] = mapped_column(Double)
+    stock_repurchase_authorized_amount: Mapped[float | None] = mapped_column(Double)
+    stock_repurchase_remaining_amount: Mapped[float | None] = mapped_column(Double)
 
     filing: Mapped["Filing"] = relationship(back_populates="cash_flows")

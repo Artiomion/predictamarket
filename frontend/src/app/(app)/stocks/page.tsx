@@ -47,8 +47,10 @@ export default function StocksPage() {
     setLoading(true)
     setError(null)
     try {
+      // Catalog covers ~347 S&P 500 tickers supported by the model. We render
+      // them all in one scroll (virtualised below); filters/search fold client-side.
       const { data } = await marketApi.getInstruments({
-        per_page: 100,
+        per_page: 500,
         search: search || undefined,
         sector: sectorFilter !== "all" ? sectorFilter : undefined,
         sort_by: sortField,

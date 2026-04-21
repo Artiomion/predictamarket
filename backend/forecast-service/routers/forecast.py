@@ -15,6 +15,7 @@ from shared.tier_limits import FORECAST_DAILY_LIMITS, TOP_PICKS_LIMITS
 from shared.utils import sanitize_nan
 
 from schemas.forecast import (
+    AlphaSignalResponse,
     BatchJobResponse,
     BatchJobStatus,
     BatchRequest,
@@ -22,6 +23,7 @@ from schemas.forecast import (
     ForecastResponse,
     TopPickItem,
 )
+from shared.models.forecast import AlphaSignal
 from services.forecast_service import (
     get_forecast_history,
     get_latest_forecast,
@@ -31,6 +33,7 @@ from services.forecast_service import (
 )
 from services.forecast_service import VALID_TICKERS
 from shared.models.forecast import Forecast
+from services.ensemble import run_ensemble
 from services.inference import run_inference
 from services.model_loader import artifacts
 
@@ -76,6 +79,70 @@ async def signals(
 ) -> list[ForecastFromDB]:
     rows = await get_signals(session, signal=signal, confidence=confidence)
     return [ForecastFromDB.model_validate(r) for r in rows]
+
+
+ALPHA_SIGNALS_RATE_LIMIT = 60  # requests/minute per user
+ALPHA_SIGNALS_RATE_WINDOW = 60  # seconds
+
+
+@router.get("/alpha-signals", response_model=list[AlphaSignalResponse])
+async def alpha_signals_feed(
+    limit: int = Query(50, ge=1, le=200),
+    confident_only: bool = Query(True),
+    user_id: uuid.UUID = Depends(require_user_id),
+    x_user_tier: str = Header("free"),
+    session: AsyncSession = Depends(get_read_session),
+) -> list[AlphaSignalResponse]:
+    """Alpha Signals feed — latest ensemble signals (Pro/Premium only).
+
+    `confident_only=True` returns only rows where all 3 models agree (q_10 > close).
+    These back-test (single test window) with Sharpe 8.15 + 63% win rate.
+    """
+    if x_user_tier not in {"pro", "premium"}:
+        raise HTTPException(status_code=403, detail="Alpha Signals require Pro or Premium subscription")
+
+    # Cheap DB read but we still cap abuse. 60/min = one poll per second.
+    count, _remaining, ttl = await check_rate_limit(
+        f"alpha:feed:{user_id}",
+        limit=ALPHA_SIGNALS_RATE_LIMIT,
+        window_seconds=ALPHA_SIGNALS_RATE_WINDOW,
+    )
+    if count > ALPHA_SIGNALS_RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit: {ALPHA_SIGNALS_RATE_LIMIT} requests per {ALPHA_SIGNALS_RATE_WINDOW}s. Retry in {ttl}s.",
+            headers={"Retry-After": str(ttl)},
+        )
+
+    # Select only the columns we serialize — skip ensemble_weights (array of 3
+    # floats × 346 rows ≈ 12KB wasted per request) and bookkeeping columns
+    # (id, instrument_id, created_at, updated_at, is_latest). Uses
+    # idx_alpha_confident partial index when confident_only=True and
+    # idx_alpha_return_1d for the ORDER BY.
+    stmt = select(
+        AlphaSignal.ticker,
+        AlphaSignal.signal,
+        AlphaSignal.confidence,
+        AlphaSignal.confident_long,
+        AlphaSignal.model_consensus,
+        AlphaSignal.disagreement_score,
+        AlphaSignal.current_close,
+        AlphaSignal.median_1d,
+        AlphaSignal.lower_80_1d,
+        AlphaSignal.upper_80_1d,
+        AlphaSignal.predicted_return_1d,
+        AlphaSignal.predicted_return_1w,
+        AlphaSignal.predicted_return_1m,
+        AlphaSignal.forecast_date,
+        AlphaSignal.expires_at,
+    ).where(AlphaSignal.is_latest.is_(True))
+
+    if confident_only:
+        stmt = stmt.where(AlphaSignal.confident_long.is_(True))
+    stmt = stmt.order_by(AlphaSignal.predicted_return_1d.desc().nullslast()).limit(limit)
+
+    rows = (await session.execute(stmt)).all()
+    return [AlphaSignalResponse.from_row(r) for r in rows]
 
 
 @router.post("/batch", response_model=BatchJobResponse, status_code=201)
@@ -137,6 +204,32 @@ async def create_forecast(
         result["persisted"] = False
 
     return result
+
+
+@router.post("/{ticker}/signals", status_code=201)
+async def create_signal_forecast(
+    ticker: str,
+    user_id: uuid.UUID = Depends(require_user_id),
+    x_user_tier: str = Header("free"),
+) -> dict:
+    """Run 3-model ensemble inference (ep2+ep4+ep5).
+
+    Premium/Pro-only. Returns a signal-oriented payload with a disagreement score
+    — NOT the primary forecast. Used by Alpha Signals feed on frontend.
+    """
+    if x_user_tier not in {"pro", "premium"}:
+        raise HTTPException(status_code=403, detail="Alpha Signals require Pro or Premium subscription")
+
+    ticker_upper = ticker.upper()
+    if VALID_TICKERS and ticker_upper not in VALID_TICKERS:
+        raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not supported")
+
+    await _check_forecast_rate_limit(str(user_id), x_user_tier)
+
+    result = await run_ensemble(ticker_upper, artifacts)
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return sanitize_nan(result)
 
 
 @router.get("/{ticker}", response_model=ForecastResponse)

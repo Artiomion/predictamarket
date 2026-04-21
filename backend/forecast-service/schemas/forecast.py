@@ -85,3 +85,51 @@ class BatchJobStatus(BaseModel):
     completed: int
     total: int
     results: list[ForecastResponse] | None = None
+
+
+# ── Alpha Signals (ensemble) ──────────────────────────────────────────────────
+
+class AlphaSignalResponse(BaseModel):
+    """Ensemble-generated signal (ep2+ep4+ep5 consensus).
+
+    `confident_long=True` = all 3 models agree lower_80 > current_close.
+    `model_consensus` = HIGH/MEDIUM/LOW tier derived from disagreement_score.
+    """
+    ticker: str
+    signal: str  # BUY | SELL | HOLD
+    confidence: str  # HIGH | MEDIUM | LOW
+    confident_long: bool
+    model_consensus: str  # HIGH | MEDIUM | LOW
+    disagreement_score: float
+    current_close: float
+    median_1d: float
+    lower_80_1d: float
+    upper_80_1d: float
+    predicted_return_1d: float | None = None
+    predicted_return_1w: float | None = None
+    predicted_return_1m: float | None = None
+    forecast_date: date
+    expires_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_row(cls, r) -> "AlphaSignalResponse":
+        """Build from a SQLAlchemy Row with explicitly-selected columns."""
+        return cls(
+            ticker=r.ticker,
+            signal=r.signal,
+            confidence=r.confidence,
+            confident_long=r.confident_long,
+            model_consensus=r.model_consensus,
+            disagreement_score=round(r.disagreement_score, 4),
+            current_close=round(r.current_close, 2),
+            median_1d=round(r.median_1d, 2),
+            lower_80_1d=round(r.lower_80_1d, 2),
+            upper_80_1d=round(r.upper_80_1d, 2),
+            predicted_return_1d=r.predicted_return_1d,
+            predicted_return_1w=r.predicted_return_1w,
+            predicted_return_1m=r.predicted_return_1m,
+            forecast_date=r.forecast_date,
+            expires_at=r.expires_at,
+        )

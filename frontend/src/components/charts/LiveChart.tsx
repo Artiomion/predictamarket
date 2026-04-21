@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   createChart,
   type IChartApi,
   type ISeriesApi,
-  type UTCTimestamp,
   ColorType,
   CrosshairMode,
   CandlestickSeries,

@@ -11,11 +11,13 @@ import { MarketNews } from "@/components/features/MarketNews"
 import { MarketStatusBanner } from "@/components/ui/market-status"
 import { marketApi } from "@/lib/api"
 
+// Sector proxies — each ticker must exist in our 346-ticker S&P 500 subset.
+// JPM/BAC/C/V aren't in the trained set; GS is the Financials proxy.
 const MARKET_TICKERS = [
-  { ticker: "AAPL", label: "S&P 500" },
+  { ticker: "AAPL", label: "Mega-cap" },
   { ticker: "MSFT", label: "Tech" },
-  { ticker: "JPM", label: "Financials" },
-  { ticker: "CVX", label: "Energy" },
+  { ticker: "GS",   label: "Financials" },
+  { ticker: "CVX",  label: "Energy" },
 ]
 
 function getGreeting(): string {
@@ -60,24 +62,27 @@ export default function DashboardPage() {
   const [marketData, setMarketData] = useState<MarketItem[]>([])
 
   useEffect(() => {
+    // Dashboard sector cards rely on hardcoded tickers (see MARKET_TICKERS above).
+    // If any are missing from the 346-ticker catalog, they silently drop out —
+    // we'd rather show 3 working cards than fail the whole dashboard.
+    // If a ticker IS dropped, a dev-mode warning in the console calls it out.
     const loadPrices = async () => {
-      try {
-        const results = await Promise.all(
-          MARKET_TICKERS.map(async ({ ticker, label }) => {
-            try {
-              const { data } = await marketApi.getPrice(ticker)
-              return { label, value: data.price, change: data.change_pct }
-            } catch {
-              return null
+      const results = await Promise.all(
+        MARKET_TICKERS.map(async ({ ticker, label }) => {
+          try {
+            const { data } = await marketApi.getPrice(ticker)
+            return { ticker, label, value: data.price, change: data.change_pct }
+          } catch {
+            if (process.env.NODE_ENV !== "production") {
+              console.warn(`[dashboard] ticker ${ticker} missing from catalog — update MARKET_TICKERS`)
             }
-          })
-        )
-        setMarketData(results.filter((r): r is MarketItem => r !== null))
-      } catch {
-        // Fallback to empty
-      } finally {
-        setLoading(false)
-      }
+            return null
+          }
+        })
+      )
+      const valid = results.filter((r): r is MarketItem & { ticker: string } => r !== null)
+      setMarketData(valid)
+      setLoading(false)
     }
     loadPrices()
   }, [])

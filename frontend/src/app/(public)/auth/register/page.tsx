@@ -46,13 +46,28 @@ export default function RegisterPage() {
 
       window.location.href = "/dashboard"
     } catch (err: unknown) {
-      const error = err as { response?: { status?: number; data?: { detail?: string } } }
+      const error = err as { response?: { status?: number; data?: { detail?: string | Array<{ loc?: unknown[]; msg?: string }> } } }
       if (error.response?.status === 400) {
         toast.error("An account with this email already exists")
       } else if (error.response?.status === 422) {
+        // FastAPI 422 returns detail as array of { loc, msg, type } objects.
+        // Surface the first validation error so users know exactly what's wrong
+        // (e.g. ".test" TLD rejected by email_validator as "special-use/reserved").
         const detail = error.response.data?.detail
         if (typeof detail === "string") {
           setErrors({ form: detail })
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          const first = detail[0] as { loc?: unknown[]; msg?: string }
+          const field = Array.isArray(first.loc) ? String(first.loc.slice(-1)[0] ?? "") : ""
+          const msg = (first.msg ?? "Please check your input")
+            // email_validator prefixes "value is not a valid email address: " — strip for brevity
+            .replace(/^value is not a valid email address:\s*/, "Email: ")
+            // Trim "Value error, " prefix from pydantic error messages
+            .replace(/^Value error,\s*/, "")
+          if (field === "email") setErrors({ email: msg })
+          else if (field === "password") setErrors({ password: msg })
+          else if (field === "name") setErrors({ name: msg })
+          else setErrors({ form: msg })
         } else {
           setErrors({ form: "Please check your input" })
         }

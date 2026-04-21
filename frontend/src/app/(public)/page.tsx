@@ -10,11 +10,15 @@ import { Performance } from "@/components/landing/Performance"
 import { Pricing } from "@/components/landing/Pricing"
 import { Footer } from "@/components/landing/Footer"
 
+// Metrics from the 3-model ensemble study (ep2+ep4+ep5 equal-weight) on the
+// post-Oct-2024 test window. WR and Return are for the Consensus BUY subset
+// (all 3 models agree lower-80% CI above current close — 27 trades, N=27).
+// Forecasts count is live count in DB, rounded.
 const stats = [
-  { value: "99.5%", label: "Win Rate" },
-  { value: "77.7%", label: "Avg Return" },
-  { value: "94", label: "S&P 500 Stocks" },
-  { value: "12,847", label: "Forecasts" },
+  { value: "63%", label: "Consensus Win Rate" },
+  { value: "+19.2%", label: "Top-20 Return" },
+  { value: "346", label: "S&P 500 Stocks" },
+  { value: "5K+", label: "Forecasts" },
 ]
 
 export default function LandingPage() {
@@ -40,7 +44,7 @@ export default function LandingPage() {
               transition={{ delay: 0.8, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-success"
             >
-              99.5% Win Rate
+              63% Consensus Win Rate
             </motion.span>
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}
@@ -48,7 +52,7 @@ export default function LandingPage() {
               transition={{ delay: 1.0, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-[var(--accent-from)]"
             >
-              77.7% Avg Return
+              Sharpe 8.15 Ensemble
             </motion.span>
           </div>
 
@@ -71,7 +75,7 @@ export default function LandingPage() {
             transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
             className="mx-auto mt-6 max-w-xl text-lg text-text-secondary md:text-xl"
           >
-            107 data signals. 94 S&P 500 stocks. One prediction engine.
+            107 data signals. 346 S&P 500 stocks. One prediction engine.
           </motion.p>
 
           <motion.div

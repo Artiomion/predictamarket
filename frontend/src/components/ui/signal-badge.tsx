@@ -51,7 +51,11 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
     >
       {signal === "BUY" ? "▲ " : signal === "SELL" ? "▼ " : ""}{signal}
       {isHighConfidence && showWinRate && signal === "BUY" && (
-        <span className="text-[10px] opacity-75">99.5% WR</span>
+        // 63% WR = ConfLong (3-model consensus) historical back-test on post-Oct-2024
+        // window. Old "99.5%" was marketing-hype from 1 model × 185 trades single-test.
+        <span className="text-[10px] opacity-75" title="Consensus BUY back-test: 63% win rate on 27 trades (single test window)">
+          63% WR
+        </span>
       )}
       {confidence && (
         <span className="text-[10px] opacity-60">{confidence}</span>

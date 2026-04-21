@@ -116,19 +116,28 @@ CREATE INDEX idx_market_price_instrument ON market.price_history (instrument_id)
 CREATE INDEX idx_market_price_ticker_date ON market.price_history (ticker, date DESC);
 
 CREATE TABLE market.macro_history (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    date            DATE NOT NULL UNIQUE,
-    vix             DOUBLE PRECISION,
-    treasury_10y    DOUBLE PRECISION,
-    sp500           DOUBLE PRECISION,
-    dxy             DOUBLE PRECISION,
-    gold            DOUBLE PRECISION,
-    oil             DOUBLE PRECISION,
-    vix_ma5         DOUBLE PRECISION,
-    sp500_return    DOUBLE PRECISION,
-    vix_contango    DOUBLE PRECISION,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date               DATE NOT NULL UNIQUE,
+    -- yfinance macro (updated every 15 min by update_macro.py)
+    vix                DOUBLE PRECISION,
+    treasury_10y       DOUBLE PRECISION,
+    sp500              DOUBLE PRECISION,
+    dxy                DOUBLE PRECISION,
+    gold               DOUBLE PRECISION,
+    oil                DOUBLE PRECISION,
+    vix_ma5            DOUBLE PRECISION,
+    sp500_return       DOUBLE PRECISION,
+    vix_contango       DOUBLE PRECISION,
+    -- FRED macro (updated daily 06:30 ET by update_fred.py)
+    cpi                DOUBLE PRECISION,
+    unemployment       DOUBLE PRECISION,
+    fed_funds_rate     DOUBLE PRECISION,
+    yield_curve_spread DOUBLE PRECISION,
+    m2_money_supply    DOUBLE PRECISION,
+    wti_crude          DOUBLE PRECISION,
+    fred_vix           DOUBLE PRECISION,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_market_macro_date ON market.macro_history (date);
 
@@ -228,6 +237,12 @@ CREATE TABLE edgar.balance_sheets (
     current_liabilities DOUBLE PRECISION,
     property_plant_equipment DOUBLE PRECISION,
     retained_earnings DOUBLE PRECISION,
+    -- Path B extensions: additional XBRL concepts required by the TFT feature set.
+    common_stock_value DOUBLE PRECISION,
+    accounts_payable_current DOUBLE PRECISION,
+    accounts_receivable_net_current DOUBLE PRECISION,
+    inventory_net DOUBLE PRECISION,
+    dividends_per_share_declared DOUBLE PRECISION,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -246,6 +261,14 @@ CREATE TABLE edgar.cash_flows (
     free_cash_flow  DOUBLE PRECISION,
     dividends_paid  DOUBLE PRECISION,
     stock_repurchases DOUBLE PRECISION,
+    -- Path B extensions: share-based comp, buybacks, asset divestiture.
+    proceeds_from_sale_of_ppe DOUBLE PRECISION,
+    stock_issued_sbc_value DOUBLE PRECISION,
+    stock_issued_sbc_shares DOUBLE PRECISION,
+    payments_tax_withholding_sbc DOUBLE PRECISION,
+    dividends_common_stock_cash DOUBLE PRECISION,
+    stock_repurchase_authorized_amount DOUBLE PRECISION,
+    stock_repurchase_remaining_amount DOUBLE PRECISION,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -283,11 +306,16 @@ CREATE TABLE news.instrument_sentiment (
     relevance_score DOUBLE PRECISION DEFAULT 1.0,
     sentiment_score DOUBLE PRECISION,
     sentiment_label VARCHAR(20) CHECK (sentiment_label IN ('positive', 'negative', 'neutral')),
+    -- 32-dim FinBERT[CLS]→IncrementalPCA vector (sent_0..sent_31 features).
+    -- Null for legacy rows created before the embedding pipeline was wired.
+    pca_vector      DOUBLE PRECISION[],
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_news_sentiment_ticker ON news.instrument_sentiment (ticker);
 CREATE INDEX idx_news_sentiment_article ON news.instrument_sentiment (article_id);
+CREATE INDEX idx_sentiment_pca_ticker_created
+    ON news.instrument_sentiment (ticker, created_at DESC);
 CREATE INDEX idx_news_sentiment_instrument ON news.instrument_sentiment (instrument_id);
 
 CREATE TABLE news.social_mentions (
@@ -417,6 +445,36 @@ CREATE TABLE forecast.forecast_history (
 );
 CREATE INDEX idx_forecast_history_ticker ON forecast.forecast_history (ticker);
 CREATE INDEX idx_forecast_history_date ON forecast.forecast_history (forecast_date);
+
+CREATE TABLE forecast.alpha_signals (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    instrument_id       UUID NOT NULL REFERENCES market.instruments(id) ON DELETE CASCADE,
+    ticker              VARCHAR(10) NOT NULL,
+    sector              VARCHAR(50),
+    signal              VARCHAR(10) NOT NULL,
+    confidence          VARCHAR(10) NOT NULL,
+    confident_long      BOOLEAN NOT NULL DEFAULT FALSE,
+    model_consensus     VARCHAR(10) NOT NULL,
+    disagreement_score  DOUBLE PRECISION NOT NULL,
+    current_close       DOUBLE PRECISION NOT NULL,
+    median_1d           DOUBLE PRECISION NOT NULL,
+    lower_80_1d         DOUBLE PRECISION NOT NULL,
+    upper_80_1d         DOUBLE PRECISION NOT NULL,
+    predicted_return_1d DOUBLE PRECISION,
+    predicted_return_1w DOUBLE PRECISION,
+    predicted_return_1m DOUBLE PRECISION,
+    ensemble_weights    DOUBLE PRECISION[] NOT NULL,
+    forecast_date       DATE NOT NULL,
+    is_latest           BOOLEAN NOT NULL DEFAULT TRUE,
+    expires_at          TIMESTAMPTZ NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_alpha_ticker        ON forecast.alpha_signals (ticker);
+CREATE INDEX idx_alpha_confident     ON forecast.alpha_signals (confident_long) WHERE confident_long = TRUE;
+CREATE INDEX idx_alpha_latest        ON forecast.alpha_signals (is_latest, forecast_date DESC) WHERE is_latest = TRUE;
+CREATE INDEX idx_alpha_return_1d     ON forecast.alpha_signals (predicted_return_1d DESC) WHERE is_latest = TRUE;
+CREATE UNIQUE INDEX idx_alpha_unique ON forecast.alpha_signals (ticker, forecast_date);
 
 -- ======================= SCHEMA: portfolio ===================================
 CREATE SCHEMA IF NOT EXISTS portfolio;

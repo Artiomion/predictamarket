@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Boolean, Date, DateTime, Double, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import BaseModel
@@ -96,3 +96,38 @@ class ForecastHistory(BaseModel):
     signal: Mapped[str | None] = mapped_column(String(10))
     was_correct: Mapped[bool | None] = mapped_column(Boolean)
     evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AlphaSignal(BaseModel):
+    """Ensemble-generated signals from ep2+ep4+ep5 (3-model consensus).
+
+    Populated by dag_alpha_signals (hourly during market hours).
+    Used by Alpha Signals feed — Premium/Pro tier feature.
+    """
+    __tablename__ = "alpha_signals"
+    __table_args__ = (
+        Index("ix_alpha_signals_latest_return", "is_latest", "predicted_return_1d"),
+        {"schema": "forecast"},
+    )
+
+    instrument_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("market.instruments.id", ondelete="CASCADE"), nullable=False,
+    )
+    ticker: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    sector: Mapped[str | None] = mapped_column(String(50))
+    signal: Mapped[str] = mapped_column(String(10), nullable=False)  # BUY / SELL / HOLD
+    confidence: Mapped[str] = mapped_column(String(10), nullable=False)
+    confident_long: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    model_consensus: Mapped[str] = mapped_column(String(10), nullable=False)
+    disagreement_score: Mapped[float] = mapped_column(Double, nullable=False)
+    current_close: Mapped[float] = mapped_column(Double, nullable=False)
+    median_1d: Mapped[float] = mapped_column(Double, nullable=False)
+    lower_80_1d: Mapped[float] = mapped_column(Double, nullable=False)
+    upper_80_1d: Mapped[float] = mapped_column(Double, nullable=False)
+    predicted_return_1d: Mapped[float | None] = mapped_column(Double)
+    predicted_return_1w: Mapped[float | None] = mapped_column(Double)
+    predicted_return_1m: Mapped[float | None] = mapped_column(Double)
+    ensemble_weights: Mapped[list[float]] = mapped_column(ARRAY(Double), nullable=False)
+    forecast_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    is_latest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

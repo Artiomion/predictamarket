@@ -27,3 +27,9 @@ htmlcov/
 # Docker
 docker/postgres/data/
 lightning_logs/
+
+# ML checkpoints — too large for git (~200MB each, 1.2GB total).
+# Download separately and mount via docker-compose volume.
+# See docs/ENSEMBLE_NOTES.md for artifact sources.
+models/*.ckpt
+models/old_backup_*/

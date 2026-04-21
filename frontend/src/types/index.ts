@@ -110,6 +110,24 @@ export interface TopPick {
   confidence: Confidence;
 }
 
+export interface AlphaSignal {
+  ticker: string;
+  signal: Signal;
+  confidence: Confidence;
+  confident_long: boolean;
+  model_consensus: 'HIGH' | 'MEDIUM' | 'LOW';
+  disagreement_score: number;
+  current_close: number;
+  median_1d: number;
+  lower_80_1d: number;
+  upper_80_1d: number;
+  predicted_return_1d: number | null;
+  predicted_return_1w: number | null;
+  predicted_return_1m: number | null;
+  forecast_date: string;
+  expires_at: string;
+}
+
 // ── Portfolio ─────────────────────────────────────────
 
 export interface Portfolio {

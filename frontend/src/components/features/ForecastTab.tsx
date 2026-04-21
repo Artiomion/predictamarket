@@ -145,8 +145,17 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
 
   // Forecast result
   const horizonData = forecast.forecast[activeHorizon]
-  const returnKey = activeHorizon === "1d" ? "predicted_return_1d" : activeHorizon === "1w" ? "predicted_return_1w" : "predicted_return_1m"
-  const predictedReturn = forecast[returnKey]
+  // Backend only sends predicted_return_{1d,1w,1m}. For 3d/2w (and as a
+  // fallback when a return field is null/stale), compute from median/current.
+  const returnKey = activeHorizon === "1d" ? "predicted_return_1d"
+    : activeHorizon === "1w" ? "predicted_return_1w"
+    : activeHorizon === "1m" ? "predicted_return_1m"
+    : null
+  const rawReturn = returnKey ? forecast[returnKey] : null
+  const computedReturn = horizonData && forecast.current_close
+    ? ((horizonData.median / forecast.current_close) - 1) * 100
+    : null
+  const predictedReturn = rawReturn ?? computedReturn
 
   return (
     <div className="space-y-6">

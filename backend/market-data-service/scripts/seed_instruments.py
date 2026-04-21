@@ -2,7 +2,7 @@
 Seed script: populate market.instruments + market.price_history + market.company_profiles.
 
 Source:
-  - Tickers: models/old_model_sp500_tickers.txt (94 S&P 500 tickers)
+  - Tickers: models/old_model_sp500_tickers.txt (346 S&P 500 tickers)
   - Sectors: models/config.json -> "sectors" dict
   - Data: yfinance (info, 5y OHLCV history)
 
@@ -41,7 +41,7 @@ CONFIG_FILE = PROJECT_ROOT / "models" / "config.json"
 
 
 def load_tickers() -> list[str]:
-    """Read 94 S&P 500 tickers from file, uppercase them."""
+    """Read 346 S&P 500 tickers from file, uppercase them."""
     raw = TICKERS_FILE.read_text().strip().splitlines()
     return [t.strip().upper() for t in raw if t.strip()]
 

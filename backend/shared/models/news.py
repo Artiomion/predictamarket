@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, Double, ForeignKey, Integer, String, Text, Boolean, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import BaseModel
@@ -36,6 +36,9 @@ class InstrumentSentiment(BaseModel):
     relevance_score: Mapped[float | None] = mapped_column(Double, default=1.0)
     sentiment_score: Mapped[float | None] = mapped_column(Double)
     sentiment_label: Mapped[str | None] = mapped_column(String(20))
+    # 32-dim FinBERT[CLS]→IncrementalPCA vector used as sent_0..sent_31 features.
+    # Null for legacy rows inserted before the embedding pipeline was wired up.
+    pca_vector: Mapped[list[float] | None] = mapped_column(ARRAY(Double))
 
     article: Mapped["Article"] = relationship(back_populates="instrument_sentiments")
 

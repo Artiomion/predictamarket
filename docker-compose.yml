@@ -164,6 +164,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DEBUG=false
       - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - MODELS_DIR=/models
+    volumes:
+      - ./models:/models:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8003/health || exit 1"]
       interval: 10s

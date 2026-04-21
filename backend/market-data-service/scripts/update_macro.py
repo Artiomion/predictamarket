@@ -70,15 +70,39 @@ async def main() -> None:
     if "sp500" in macro.columns:
         macro["sp500_return"] = np.log(macro["sp500"] / macro["sp500"].shift(1))
 
-    # VIX term structure
-    try:
-        vix3m = await asyncio.to_thread(
-            lambda: yf.download("^VIX3M", period="1y", progress=False, timeout=15)["Close"].squeeze()
+    # VIX term structure — contango convention: positive = market calm forward
+    # (far-dated > near-dated), negative = stress (backwardation).
+    #
+    # We compute `contango = long_tenor / short_tenor - 1`. ^VIX is 30-day
+    # implied vol (spot). ^VIX3M is 93-day, ^VIX9D is 9-day.
+    #   - Prefer ^VIX3M: contango = VIX3M / VIX - 1
+    #   - Fallback ^VIX9D: contango = VIX / VIX9D - 1  (VIX is the longer tenor)
+    async def _fetch_vix_series(symbol: str):
+        data = await asyncio.to_thread(
+            lambda: yf.download(symbol, period="1y", progress=False, timeout=15)
         )
-        vix3m.index = vix3m.index.tz_localize(None) if vix3m.index.tz else vix3m.index
-        macro["vix_contango"] = vix3m / macro["vix"] - 1
-    except Exception:
-        macro["vix_contango"] = 0.0
+        if len(data) == 0:
+            return None
+        s = data["Close"].squeeze()
+        s.index = s.index.tz_localize(None) if s.index.tz else s.index
+        return s
+
+    macro["vix_contango"] = 0.0
+    for symbol, long_is_fetched in (("^VIX3M", True), ("^VIX9D", False)):
+        try:
+            series = await _fetch_vix_series(symbol)
+            if series is None:
+                continue
+            if long_is_fetched:
+                macro["vix_contango"] = series / macro["vix"] - 1
+            else:
+                macro["vix_contango"] = macro["vix"] / series - 1
+            await logger.ainfo("vix_term_source", symbol=symbol, rows=len(series))
+            break
+        except Exception as exc:  # noqa: BLE001 — yfinance error surface is broad
+            await logger.awarning("vix_term_failed", symbol=symbol, error=str(exc))
+    else:
+        await logger.awarning("vix_contango_fallback_zero")
 
     macro = macro.dropna(subset=["vix", "sp500"]).reset_index()
     macro.rename(columns={"index": "date", "Date": "date"}, inplace=True)

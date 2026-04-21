@@ -15,16 +15,34 @@ const pageTitles: Record<string, string> = {
   "/": "Dashboard",
   "/dashboard": "Dashboard",
   "/top-picks": "Top Picks",
+  "/alpha-signals": "Alpha Signals",
   "/stocks": "Stocks",
   "/portfolio": "Portfolio",
   "/watchlist": "Watchlist",
   "/news": "News",
   "/earnings": "Earnings",
-  "/notifications": "Notifications",
+  "/notifications": "Alerts",
   "/settings": "Settings",
   "/billing": "Billing",
   "/billing/success": "Billing",
   "/billing/cancel": "Billing",
+}
+
+// Fallback: turn "/some-slug/aapl" → "Some Slug / AAPL" so header never shows
+// a raw URL segment even when we add a new route and forget to register a title.
+function prettifyPath(path: string): string {
+  const parts = path.split("/").filter(Boolean)
+  if (!parts.length) return "PredictaMarket"
+  return parts
+    .map((seg) => {
+      const isTicker = /^[A-Z.-]{1,6}$/.test(seg.toUpperCase()) && seg.length <= 6
+      if (isTicker) return seg.toUpperCase()
+      return seg
+        .split("-")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ")
+    })
+    .join(" / ")
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -40,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return onConnectionChange(() => {})
   }, [token])
 
-  const title = pageTitles[pathname] || pathname.split("/").pop() || "PredictaMarket"
+  const title = pageTitles[pathname] || prettifyPath(pathname)
 
   const headerUser = {
     name: user?.full_name ?? "User",

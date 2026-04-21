@@ -3,6 +3,7 @@ TFT model loader — lazy singleton.
 Loads checkpoint, config, dataset_params, PCA model, valid tickers.
 """
 
+import hashlib
 import json
 import os
 import pickle
@@ -34,15 +35,78 @@ logger = structlog.get_logger()
 _MODELS_DIR = Path(os.environ.get("MODELS_DIR", Path(__file__).resolve().parent.parent.parent.parent / "models"))
 
 
+# Explicit checkpoint assignments — DO NOT rely on alphabetical sort.
+# Selection based on walk-forward-lite ensemble study (see docs/model-eval.md):
+#   ep5 = primary (best Top-20 Sharpe 1.36, solid MAPE 4.86%)
+#   ep2 = ensemble member (best ConfLong Sharpe 5.70, WR 61.1%)
+#   ep4 = ensemble member (best MAPE 1d 4.74%)
+PRIMARY_CKPT = "tft-epoch=05-val_loss=9.3008.ckpt"
+ENSEMBLE_CKPTS = [
+    "tft-epoch=02-val_loss=8.8051.ckpt",
+    "tft-epoch=04-val_loss=9.2586.ckpt",
+    "tft-epoch=05-val_loss=9.3008.ckpt",
+]
+
+# SHA256 of exact weights we validated in the ensemble study.
+# Mismatch logs a warning; we still load (useful for dev/retraining) but the
+# warning is a canary for "somebody silently swapped the file" incidents.
+CKPT_SHA256 = {
+    "tft-epoch=02-val_loss=8.8051.ckpt": "55eeafea8fc92e1c44e4bee9cf7ac0fe431bcdf0cb8a35b2c62ae93a8e5cb126",
+    "tft-epoch=04-val_loss=9.2586.ckpt": "b9ea9c7e6098a8745c9eb3252e9aa2bd14b8ccb8c53fa350fb924fbbcf95010f",
+    "tft-epoch=05-val_loss=9.3008.ckpt": "ae103556b1fb1f5fbf5fd10c27b935b2e4f691bc0d5bc0afe0c6741e51d7330f",
+}
+
+
+def _verify_ckpt_sha(ckpt_path: str) -> None:
+    name = os.path.basename(ckpt_path)
+    expected = CKPT_SHA256.get(name)
+    if expected is None:
+        return  # unknown ckpt — skip (dev or retraining)
+    h = hashlib.sha256()
+    with open(ckpt_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    actual = h.hexdigest()
+    if actual != expected:
+        structlog.get_logger().warning(
+            "ckpt_sha_mismatch", ckpt=name, expected=expected, actual=actual,
+        )
+    else:
+        structlog.get_logger().info("ckpt_sha_verified", ckpt=name)
+
+
+def _load_ckpt(ckpt_path: str):
+    """Load a TFT checkpoint on CPU, with weights_only fallback for older lightning."""
+    _verify_ckpt_sha(ckpt_path)
+    from pytorch_forecasting import TemporalFusionTransformer
+    try:
+        m = TemporalFusionTransformer.load_from_checkpoint(
+            ckpt_path, map_location="cpu", weights_only=False
+        )
+    except TypeError:
+        m = TemporalFusionTransformer.load_from_checkpoint(
+            ckpt_path, map_location="cpu"
+        )
+    m.eval()
+    return m
+
+
 class ModelArtifacts:
-    """Thread-safe lazy loader for all TFT model artifacts."""
+    """Thread-safe lazy loader for all TFT model artifacts.
+
+    Primary model (ep5) loads eagerly on first use.
+    Ensemble members (ep2, ep4) load on first ensemble request.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._ensemble_lock = threading.Lock()
         self._loaded = False
+        self._ensemble_loaded = False
         self.config: dict = {}
         self.dataset_params: dict = {}
         self.tft_model = None
+        self.ensemble_models: list = []  # [ep2, ep4, ep5] in order
         self.pca = None
         self.finbert_tokenizer = None
         self.finbert_model = None
@@ -52,7 +116,7 @@ class ModelArtifacts:
         self.checkpoint_name: str = ""
 
     def _load_sync(self) -> None:
-        """Load all artifacts. Runs in a thread."""
+        """Load primary artifacts. Runs in a thread."""
         with self._lock:
             if self._loaded:
                 return
@@ -77,7 +141,7 @@ class ModelArtifacts:
                 self.dataset_params["categorical_encoders"]["__group_id__ticker"].classes_.keys()
             )
 
-            # 3. Valid tickers (94 S&P 500)
+            # 3. Valid tickers (346 S&P 500 ∩ trained)
             ticker_file = models_dir / "old_model_sp500_tickers.txt"
             self.valid_tickers = {
                 t.strip().upper()
@@ -85,25 +149,22 @@ class ModelArtifacts:
                 if t.strip()
             }
 
-            # 4. TFT checkpoint
-            ckpts = sorted([f for f in os.listdir(models_dir) if f.endswith(".ckpt")])
-            if not ckpts:
-                raise FileNotFoundError("No .ckpt file found in models dir")
-
-            from pytorch_forecasting import TemporalFusionTransformer
-
-            self.checkpoint_name = ckpts[-1]
-            ckpt_path = str(models_dir / self.checkpoint_name)
-            try:
-                self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
-                    ckpt_path, map_location="cpu", weights_only=False
+            # 4. Primary TFT checkpoint (ep5)
+            self.checkpoint_name = PRIMARY_CKPT
+            ckpt_path = str(models_dir / PRIMARY_CKPT)
+            if not os.path.exists(ckpt_path):
+                # Fallback: pick last available ckpt (legacy dev environments)
+                ckpts = sorted([f for f in os.listdir(models_dir) if f.endswith(".ckpt")])
+                if not ckpts:
+                    raise FileNotFoundError("No .ckpt file found in models dir")
+                self.checkpoint_name = ckpts[-1]
+                ckpt_path = str(models_dir / self.checkpoint_name)
+                structlog.get_logger().warning(
+                    "primary_ckpt_missing_using_fallback",
+                    expected=PRIMARY_CKPT, using=self.checkpoint_name,
                 )
-            except TypeError:
-                # Older lightning doesn't support weights_only kwarg
-                self.tft_model = TemporalFusionTransformer.load_from_checkpoint(
-                    ckpt_path, map_location="cpu"
-                )
-            self.tft_model.eval()
+
+            self.tft_model = _load_ckpt(ckpt_path)
 
             # 5. PCA model
             with open(models_dir / "pca_model.pkl", "rb") as f:
@@ -121,7 +182,11 @@ class ModelArtifacts:
                 self.finbert_model = None
 
             self._loaded = True
-            structlog.get_logger().info("models_loaded", tft_ckpt=ckpts[-1], valid_tickers=len(self.valid_tickers))
+            structlog.get_logger().info(
+                "models_loaded",
+                tft_ckpt=self.checkpoint_name,
+                valid_tickers=len(self.valid_tickers),
+            )
 
     @property
     def is_loaded(self) -> bool:
@@ -130,6 +195,38 @@ class ModelArtifacts:
     def ensure_loaded(self) -> None:
         if not self._loaded:
             self._load_sync()
+
+    def ensure_ensemble_loaded(self) -> None:
+        """Lazy-load the 3 ensemble checkpoints (ep2, ep4, ep5).
+        ep5 is the primary and may already be loaded — reuse it to save RAM.
+        """
+        self.ensure_loaded()
+        with self._ensemble_lock:
+            if self._ensemble_loaded:
+                return
+
+            models_dir = _MODELS_DIR
+            structlog.get_logger().info("loading_ensemble", ckpts=ENSEMBLE_CKPTS)
+
+            ensemble = []
+            for ckpt_name in ENSEMBLE_CKPTS:
+                if ckpt_name == self.checkpoint_name and self.tft_model is not None:
+                    # Reuse already-loaded primary
+                    ensemble.append(self.tft_model)
+                    continue
+                ckpt_path = str(models_dir / ckpt_name)
+                if not os.path.exists(ckpt_path):
+                    structlog.get_logger().error("ensemble_ckpt_missing", ckpt=ckpt_name)
+                    raise FileNotFoundError(f"Ensemble checkpoint missing: {ckpt_name}")
+                ensemble.append(_load_ckpt(ckpt_path))
+
+            self.ensemble_models = ensemble
+            self._ensemble_loaded = True
+            structlog.get_logger().info("ensemble_loaded", count=len(ensemble))
+
+    @property
+    def is_ensemble_loaded(self) -> bool:
+        return self._ensemble_loaded
 
 
 # Singleton

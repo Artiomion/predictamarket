@@ -26,7 +26,7 @@ router = APIRouter()
 @router.get("/instruments", response_model=InstrumentListResponse)
 async def list_instruments(
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    per_page: int = Query(50, ge=1, le=500),  # cap 100→500 so frontend can render entire 347-ticker catalog in one call
     sector: str | None = Query(None),
     search: str | None = Query(None),
     sort_by: str = Query("ticker"),

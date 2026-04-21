@@ -48,7 +48,10 @@ export default function WatchlistPage() {
   }, [])
 
   useEffect(() => {
-    marketApi.getInstruments({ per_page: 100 })
+    // Load entire catalog so autocomplete can match any of 346 tickers —
+    // previously capped at 100 which meant typing "NVDA" or "ZTS" returned
+    // zero suggestions and Enter did nothing.
+    marketApi.getInstruments({ per_page: 500 })
       .then(({ data }) => setInstruments(data.data || []))
       .catch(() => {})
   }, [])
@@ -102,8 +105,17 @@ export default function WatchlistPage() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && suggestions.length > 0) {
+    if (e.key !== "Enter") return
+    // Prefer autocomplete top match. Fallback: if user types a full ticker
+    // that matches exactly, add it directly even if suggestions haven't rendered
+    // (e.g. paste + Enter faster than the useMemo recompute).
+    if (suggestions.length > 0) {
       addTicker(suggestions[0].ticker)
+      return
+    }
+    const exact = tickerInput.trim().toUpperCase()
+    if (exact && instruments.some((i) => i.ticker === exact) && !items.some((w) => w.ticker === exact)) {
+      addTicker(exact)
     }
   }
 
