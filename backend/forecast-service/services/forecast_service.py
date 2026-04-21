@@ -43,14 +43,19 @@ async def get_or_create_model_version(session: AsyncSession, checkpoint_name: st
         is_active=True,
         # Metrics from the 3-model ensemble (ep2+ep4+ep5 equal-weight) study
         # on the post-Oct-2024 test window — see docs/ENSEMBLE_NOTES.md.
+        # DirAcc is computed against prev_close (true direction of future close
+        # relative to today), NOT against day-1-of-forecast curve.
         metrics={
             "mape_1d": 4.78,
             "mape_22d": 12.49,
+            "diracc_1d": 0.488,   # coin flip at 1 day — don't market
+            "diracc_22d": 0.680,  # strong edge at 1 month — 34σ above chance
             "top20_sharpe": 1.45,
             "top20_return_pct": 19.19,
             "conflong_sharpe": 8.15,
             "conflong_win_rate": 63.0,
             "conflong_n_trades": 27,
+            "test_samples": 9200,
         },
     )
     session.add(mv)

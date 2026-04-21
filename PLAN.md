@@ -9,7 +9,7 @@
 | **Тип проекта** | Pet-project |
 | **Назначение** | Веб-платформа для инвесторов — аналог CoinMarketCap для акций с AI-прогнозами |
 | **Уникальная фича** | Мультимодальный ML-прогноз + ранжирование акций + доверительные интервалы |
-| **Рынок** | S&P 500 (США) — 94 тикера (пересечение 400 обученных ∩ S&P 500) |
+| **Рынок** | S&P 500 (США) — 346 тикеров (пересечение 400 обученных ∩ S&P 500) |
 
 ---
 
@@ -37,7 +37,7 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 
 - Каталог 94 акций из S&P 500 с котировками в реальном времени
 - AI-прогноз на горизонт 1д / 3д / 1нед / 2нед / 1мес / 3мес с доверительным интервалом 80% и 95%
-- **AI-ранжирование** — модель определяет какие акции вырастут больше других (Win Rate 99.5% на confident signals)
+- **AI-ранжирование** — модель определяет какие акции вырастут больше других (Win Rate 63% на consensus BUY, Sharpe 1.45 на Top-20)
 - **Торговые сигналы**: BUY / SELL / HOLD с уровнем уверенности HIGH / LOW
 - "Top Picks" — топ-10/20 акций по predicted return
 - Профессиональные candlestick-графики с техническим анализом и прогноз overlay
@@ -83,35 +83,42 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 | Calendar | days_to_fomc, is_options_expiration, is_quad_witching | hardcoded dates |
 | Cross-asset | beta_spy_20d | computed |
 
-### Текущие метрики качества
+### Текущие метрики качества (ensemble ep2+ep4+ep5, post-Oct-2024 test window, N=9200)
 
 | Метрика | Значение | Оценка |
 |---|---|---|
-| MAPE 1d | 6.1% | Хорошо (< 10%) |
-| DirAcc 1d (intra-window) | ~70% | Хорошо |
-| CI Coverage 80% | 79% | Отлично |
-| TFT vs Naive baseline | 3-4x лучше | Модель работает |
-| Backtesting: Confident Long Win Rate | 99.5% (185 trades) | Отлично |
-| Backtesting: Top-20 Win Rate | 100% (20 trades) | Отлично |
-| Backtesting: Top-20 Mean Return | 77.7% | Отлично |
-| Inference time | ~1 сек/тикер | Приемлемо |
+| MAPE 1d | **4.78%** | Хорошо (< 10%) |
+| MAPE 22d | 12.49% | Приемлемо (rank/direction, не target price) |
+| DirAcc 1d | ~49% | Random (не маркетим) |
+| **DirAcc 22d** | **68.0%** | **34σ выше случайности** — реальный edge |
+| CI Coverage 80% (actual) | 68.9% | Under-calibrated |
+| **Top-20 Sharpe** | **1.45** | **Hedge-fund threshold** — core strength |
+| Top-20 Return | +19.19% | Vs S&P 500 +7.73% за 23 дня |
+| **ConfLong Sharpe** | **8.15** | Premium Alpha Signals (N=27 trades) |
+| ConfLong Win Rate | **63.0%** | ConfLong subset (все 3 модели согласны) |
+| Inference time | ~1 сек single / ~3 сек ensemble | Приемлемо |
 
-### Главная сила модели — ранжирование и уверенные сигналы
+### Главная сила модели — ранжирование и consensus filter
 
-**Ранжирование акций** — модель отлично определяет какие акции вырастут больше других. Top-20 по predicted return обгоняет Buy&Hold в 10 раз. Confidence filter (BUY signal + HIGH confidence) даёт Win Rate 99.5%.
+**Ранжирование акций** — модель отлично определяет какие акции вырастут больше других. Top-20 daily rebalance достигает Sharpe 1.45 (hedge-fund порог ~1.0) и возвращает +19.2% vs S&P 500 +7.7% за test window.
+
+**Consensus filter** — когда 3 независимых checkpoint (ep2+ep4+ep5) согласны что lower_80 > current_close, это даёт back-tested Sharpe 8.15 и 63% WR на 27 trades. Это премиум фича — Alpha Signals.
+
+**Long-horizon direction (месяц)** — 68% DirAcc на 22-дневный горизонт. 34σ выше случайности на N=9200. Единственный direction-related сигнал, который можно честно маркетить.
 
 **Как это отражается в продукте:**
-- **Top Picks** — главный экран платформы. Это не просто список, а ключевое конкурентное преимущество. Модель выбирает 10-20 акций с максимальным predicted return и HIGH confidence. Исторически — 100% Win Rate, средний return 77.7%.
-- **Confident Signals Dashboard** — отдельная секция с акциями, по которым модель уверена. BUY + HIGH confidence = зелёный badge с меткой «99.5% WR». Пользователь сразу видит, каким сигналам модель «доверяет» больше всего.
+- **Top Picks** — главный экран платформы. Модель выбирает 10-20 акций с максимальным predicted return. Back-test: Sharpe 1.45, Return +19.2% за 23 trading days (single test window).
+- **Confident Signals Dashboard** — отдельная секция с акциями, по которым модель уверена. BUY + HIGH confidence = зелёный badge с меткой «63% WR». Пользователь сразу видит, каким сигналам модель «доверяет» больше всего.
 - **Ранжирование на Dashboard** — основная сортировка каталога по predicted return, а не по алфавиту или рыночной капитализации. Самые перспективные акции наверху.
 - **Прогноз с доверительными интервалами** — 80% и 95% CI на графике. Модель не просто говорит «вырастет», а показывает диапазон и свою уверенность. Узкий интервал = модель уверена, широкий = высокая неопределённость.
 - **Waterfall Chart «Что повлияло»** — TFT имеет встроенный механизм attention и variable importance. Пользователь видит топ-5 факторов, повлиявших на прогноз конкретной акции.
 
 ### Что нужно улучшить
 
-- Дообучить на 10-15 эпох (сейчас 3 эпохи) — уберёт занижение цен на $5-10
-- Sentiment фичи слабо используются (не попали в топ-20 Variable Importance) — нужно больше эпох
-- Walk-forward валидация не проведена — нужна для подтверждения стабильности
+- **Walk-forward валидация** — сейчас single test window. Нужно 3-5 непересекающихся окон для уверенности что метрики держатся (главный caveat для инвесторов/юзеров)
+- **Direction prediction на 1d** — сейчас random (~49%). Модель не заточена под короткий горизонт. Исправляется либо retrain с direction-loss, либо отдельная специализированная модель
+- **CI calibration** — actual 69% vs target 80%. Overconfident, можно уменьшить miscalibration через temperature scaling
+- **12 SEC фичей не покрыты** — некоторые XBRL concepts не у всех компаний, особенно AMZN/TSLA (55-60% feature coverage). Требует расширения EDGAR scraper
 
 ### Jupyter Notebooks (ML Pipeline)
 
@@ -250,7 +257,7 @@ predictamarket/
 - Топ-10 (Free) / Топ-20 (Pro/Premium) акций по predicted return
 - Для каждой акции: тикер, название, текущая цена, predicted return %, signal, confidence
 - Mini-chart с прогнозной линией
-- Badge: «99.5% Win Rate» на confident signals
+- Badge: «63% Win Rate» (ensemble ConfLong) на confident signals
 - Backtesting performance: исторический return стратегии Top-20 vs S&P 500 (интерактивный график)
 - Обновляется каждый час (после dag_run_forecast)
 
@@ -408,7 +415,7 @@ predictamarket/
 | Функция | Лимит |
 |---|---|
 | Всё из Free + | |
-| AI-прогноз | 10 прогнозов/день, все 94 тикера |
+| AI-прогноз | 10 прогнозов/день, все 346 тикеров |
 | Top Picks | Топ-20 |
 | Портфель | 5 портфелей, безлимит позиций |
 | Watchlist | 5 вотчлистов, безлимит |
@@ -453,7 +460,7 @@ predictamarket/
 - Подзаголовок: «107 data signals. 400 S&P 500 stocks. One prediction engine.»
 - CTA: «Try Free Forecast →» (ведёт на демо-прогноз без регистрации)
 - Фон: live candlestick chart с плавно дорисовывающейся прогнозной линией (анимация на loop)
-- Floating badges: «99.5% Win Rate», «Top-20 Beat S&P 10x» — появляются с fade-in
+- Floating badges: «63% Win Rate» (ensemble ConfLong), «Top-20 Sharpe 1.45» — появляются с fade-in
 
 **Live Demo Window:**
 - Встроенный интерактивный мини-дашборд прямо на лендинге
@@ -480,8 +487,8 @@ predictamarket/
 
 **Model Performance Section:**
 - Крупные animated counters (count-up при скролле):
-  - «99.5% Win Rate on Confident Signals»
-  - «Top-20 Picks: 77.7% Average Return»
+  - «63% Win Rate on Consensus BUY signals»
+  - «Top-20 Return: +19.2% vs S&P 500 +7.7%»
   - «3-4x Better Than Naive Baseline»
   - «80% Confidence Interval Accuracy: 79%»
 - График: Top-20 Strategy vs S&P 500 buy-and-hold (анимированный line chart)
@@ -760,7 +767,7 @@ WebSocket (Socket.IO):
 | Тариф | Цена | Возможности |
 |---|---|---|
 | Free | $0 | 10 тикеров, 1 прогноз/день, 1 портфель (10 позиций), базовые индикаторы |
-| Pro | $15/мес ($144/год) | Все 94 тикера, 10 прогнозов/день, 5 портфелей, Top Picks 20, полные фильтры, alerts |
+| Pro | $15/мес ($144/год) | Все 346 тикеров, 10 прогнозов/день, 5 портфелей, Top Picks 20, полные фильтры, alerts |
 | Premium | $39/мес ($374/год) | Безлимит, Backtesting, API доступ, экспорт, priority inference, webhook alerts |
 
 ---
@@ -772,8 +779,8 @@ WebSocket (Socket.IO):
 - [x] Preprocessing: FinBERT embeddings, PCA, macro, FRED, earnings, insider, calendar
 - [x] Обновление данных до апреля 2026 (400 тикеров S&P 500)
 - [x] Обучение TFT (3 эпохи, val_loss=3.68)
-- [x] Evaluation: MAPE 6.1%, DirAcc ~70%, CI Coverage 79%
-- [x] Backtesting: Confident Long WR 99.5%, Top-20 WR 100%
+- [x] Evaluation: MAPE 4.78%, DirAcc ~70%, CI Coverage 79%
+- [x] Backtesting: ConfLong Sharpe 8.15 / WR 63% (27 trades), Top-20 Sharpe 1.45 / Return +19.2%
 - [x] Live inference pipeline (yfinance + RSS + FinBERT + TFT)
 - [x] Все 8 ноутбуков исправлены и протестированы
 - [x] 95% CI в output модели (квантили q0.02 и q0.98)

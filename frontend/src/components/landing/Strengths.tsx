@@ -26,24 +26,30 @@ const capabilities = {
         "When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price, the signal backtests at Sharpe 8.15 across 27 trades.",
     },
     {
+      title: "1-month direction (up/down)",
+      metric: "68% accuracy",
+      detail:
+        "Ensemble DirAcc at 22-trading-day horizon is 68% across 9,200 test samples — ~34σ above a coin flip. The model is genuinely strong at \"will this stock be higher or lower in a month\".",
+    },
+    {
       title: "Short-horizon MAPE (1-day)",
       metric: "4.78% error",
       detail:
-        "Next-day price predictions are accurate within ~5% on average — usable for directional trade timing.",
+        "Next-day price predictions are accurate within ~5% on average — usable for timing around earnings or event windows.",
     },
   ],
   limitations: [
     {
-      title: "Single-day direction (up/down)",
+      title: "1-day direction (up/down)",
       metric: "~50% DirAcc",
       detail:
-        "Binary up/down prediction at 1-day horizon is no better than a coin flip. Don't use the signal as a standalone 'will it go up tomorrow?' indicator.",
+        "Binary up-or-down prediction at 1-day horizon is no better than a coin flip. The model captures multi-week drift, not daily noise — don't use the next-day signal as a standalone 'will it close green tomorrow?' indicator.",
     },
     {
       title: "Long-horizon absolute prices",
       metric: "±12% at 1-month",
       detail:
-        "The 1-month median-absolute-error of 12.5% is too wide to anchor trades on a specific target price. Use the rank tier, not the dollar figure.",
+        "The 1-month median-absolute-error of 12.5% is too wide to anchor trades on a specific target price. Use the rank tier or the direction call, not the dollar figure.",
     },
     {
       title: "Short / SELL signals",
