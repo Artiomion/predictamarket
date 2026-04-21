@@ -2,13 +2,15 @@
 
 import { motion } from "framer-motion"
 import { TrendingUp, Info } from "lucide-react"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 
 /**
  * Back-test summary for the Top-20 daily-rebalance strategy vs buy-and-hold S&P 500.
  *
- * Numbers come directly from the 3-model ensemble study (see docs/ENSEMBLE_NOTES.md)
- * on the post-2024-10-31 test window. Not synthesized — these are the actual
- * back-test outcomes on held-out data the model never saw during training.
+ * Numbers sourced from MODEL_METRICS (the single-source-of-truth that
+ * lib/model-metrics.ts exports). Presentation-only fields (period, names,
+ * descriptions) live here; numeric metrics are referenced by name so a retrain
+ * + one edit to MODEL_METRICS updates every surface that reads from it.
  *
  * We intentionally don't render a synthetic equity curve: without the per-day
  * return series in our production DB, any curve would be fabricated. Showing
@@ -16,25 +18,25 @@ import { TrendingUp, Info } from "lucide-react"
  */
 const BACKTEST = {
   period: "Nov 2024 — early Apr 2025",
-  trading_days: 23,
+  trading_days: MODEL_METRICS.test_trading_days,
   strategy: {
     name: "Top-20 Daily Rebalance",
-    return_pct: 19.19,
-    sharpe: 1.45,
+    return_pct: MODEL_METRICS.top20_return_pct,
+    sharpe: MODEL_METRICS.top20_sharpe,
     description:
       "Long top 20 tickers each day by predicted 1-day return, equal-weight, rebalanced at close.",
   },
   benchmark: {
     name: "S&P 500 Buy & Hold",
-    return_pct: 7.73,
-    sharpe: 0.8,
+    return_pct: MODEL_METRICS.sp500_return_pct,
+    sharpe: 0.8,   // not in MODEL_METRICS yet — add if we make a benchmark tab
     description: "Passive long position over the same window.",
   },
   consensus: {
     name: "Consensus BUY Only",
-    sharpe: 8.15,
-    win_rate: 63.0,
-    trades: 27,
+    sharpe: MODEL_METRICS.conflong_sharpe,
+    win_rate: MODEL_METRICS.conflong_win_rate_pct,
+    trades: MODEL_METRICS.conflong_n_trades,
     description:
       "Long only when all 3 ensemble models place the 80% CI lower bound above current close.",
   },

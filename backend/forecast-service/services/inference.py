@@ -52,19 +52,53 @@ def _compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
 
 # ── Data fetchers (all from DB) ──────────────────────────────────────────────
 
-def _backfill_fresh_prices(ticker: str) -> None:
+# Max allowed delta between yfinance response and the most recent DB close,
+# as a safety net against rate-limit-induced stale / unadjusted-for-split
+# responses. A legitimate 1-day move >50% is astronomically unlikely for a
+# liquid S&P 500 name; a 50% reversal almost certainly means yfinance is
+# returning pre-split unadjusted history or a cached stale row. Rejecting
+# the entire backfill protects the DB from corruption.
+_BACKFILL_MAX_DELTA = 0.5
+
+
+def _get_latest_db_close(cur, ticker: str) -> float | None:
+    """Latest stored close for ticker, or None if no history."""
+    cur.execute(
+        "SELECT close FROM market.price_history WHERE ticker = %s "
+        "ORDER BY date DESC LIMIT 1",
+        (ticker,),
+    )
+    row = cur.fetchone()
+    return float(row[0]) if row and row[0] is not None else None
+
+
+def _backfill_fresh_prices(ticker: str) -> bool:
     """Fetch latest 5 days from yfinance and upsert into price_history.
-    Ensures DB has the most current data before inference."""
+
+    Returns True if a write happened, False if we skipped (so the caller
+    can avoid claiming the TTL slot and retry sooner).
+
+    Sanity-checks the response against the most recent DB close: if the
+    incoming yfinance Close is >50% different from the last known good
+    price, assume rate-limit corruption / pre-split unadjusted data and
+    bail without writing. This prevents the silent-corruption bug where
+    SYK ($330) gets overwritten with $28 from a stale yfinance response.
+    """
     try:
         import yfinance as yf
 
         hist = yf.download(ticker, period="5d", progress=False, timeout=10)
         if hist is None or len(hist) == 0:
-            return
+            return False
 
         hist = hist.reset_index()
         if isinstance(hist.columns[0], tuple):
             hist.columns = [c[0] if isinstance(c, tuple) else c for c in hist.columns]
+
+        new_close_raw = hist["Close"].iloc[-1]
+        new_close = float(new_close_raw) if new_close_raw == new_close_raw else None
+        if not new_close or new_close <= 0:
+            return False
 
         conn = psycopg2.connect(_get_db_url(), connect_timeout=5)
         try:
@@ -72,8 +106,21 @@ def _backfill_fresh_prices(ticker: str) -> None:
             cur.execute("SELECT id FROM market.instruments WHERE ticker = %s", (ticker,))
             row = cur.fetchone()
             if not row:
-                return
+                return False
             inst_id = row[0]
+
+            # SANITY CHECK: reject suspicious yfinance responses before they
+            # corrupt the DB via ON CONFLICT UPDATE.
+            db_close = _get_latest_db_close(cur, ticker)
+            if db_close and db_close > 0:
+                delta = abs(new_close / db_close - 1)
+                if delta > _BACKFILL_MAX_DELTA:
+                    structlog.get_logger().error(
+                        "backfill_rejected_extreme_delta",
+                        ticker=ticker, yf_close=new_close,
+                        db_close=db_close, delta_pct=round(delta * 100, 1),
+                    )
+                    return False  # do NOT claim TTL — allow retry next call
 
             for _, r in hist.iterrows():
                 trade_date = r["Date"].date() if hasattr(r["Date"], "date") else r["Date"]
@@ -116,10 +163,12 @@ def _backfill_fresh_prices(ticker: str) -> None:
                         _r.close()
 
             structlog.get_logger().info("prices_backfilled", ticker=ticker, rows=len(hist))
+            return True
         finally:
             conn.close()
     except Exception as exc:
         structlog.get_logger().warning("backfill_prices_skipped", ticker=ticker, error=str(exc))
+        return False
 
 
 _MACRO_COLS = ("vix", "treasury_10y", "sp500", "dxy", "gold", "oil", "vix_ma5", "sp500_return", "vix_contango")
@@ -193,12 +242,18 @@ def _backfill_fresh_macro() -> None:
 
 def _fetch_price_data_sync(ticker: str, lookback_days: int = 365) -> pd.DataFrame | None:
     """Backfill fresh data from yfinance, then read from DB + compute technicals."""
+    # Check TTL under lock but DON'T claim the slot yet — we only claim it on
+    # successful backfill. If backfill fails (rate-limit, network, sanity
+    # rejection), the next call 5s from now will retry instead of waiting 5
+    # whole minutes. Small downside: concurrent callers may both attempt the
+    # network call. Acceptable vs silent staleness.
     with _backfill_lock:
         need_prices = time.time() - _last_backfill_prices.get(ticker, 0) >= _BACKFILL_TTL
-        if need_prices:
-            _last_backfill_prices[ticker] = time.time()
     if need_prices:
-        _backfill_fresh_prices(ticker)
+        wrote = _backfill_fresh_prices(ticker)
+        if wrote:
+            with _backfill_lock:
+                _last_backfill_prices[ticker] = time.time()
     _backfill_fresh_macro()
 
     cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")

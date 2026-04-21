@@ -13,6 +13,7 @@ import { AccuracyCard } from "@/components/features/AccuracyCard"
 import { ForecastChart } from "@/components/charts/ForecastChart"
 import { WalkForwardChart } from "@/components/charts/WalkForwardChart"
 import { forecastApi } from "@/lib/api"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 import type { Forecast, ForecastHorizon } from "@/types"
 import { cn } from "@/lib/utils"
 
@@ -182,9 +183,9 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
       )}
 
       {/* Ranking context — what the TFT is actually good at.
-          Absolute price prediction has MAPE ~12% at 1M, but relative ranking
-          across the 346-ticker catalog is where the model generates Sharpe 1.45.
-          Showing the rank orients the user to the real signal. */}
+          Absolute price prediction has a wide MAPE at 1M; relative ranking
+          across the full catalog is where the model generates alpha.
+          Concrete metrics live in lib/model-metrics.ts. */}
       {rank && rank.rank_1m && (
         <RankingContext rank={rank} ticker={ticker} />
       )}
@@ -300,8 +301,8 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
 }
 
 /** Ranking context block — reframes the forecast tab around what the TFT
- *  actually excels at (relative ranking with Sharpe 1.45) rather than absolute
- *  price prediction (MAPE ~12% at 1M). Shown above the forecast chart. */
+ *  actually excels at (relative ranking) rather than absolute price prediction.
+ *  Concrete metrics in lib/model-metrics.ts. Shown above the forecast chart. */
 function RankingContext({ rank, ticker }: { rank: RankInfo; ticker: string }) {
   const r1m = rank.rank_1m!
   const total = rank.total_tickers
@@ -360,9 +361,10 @@ function RankingContext({ rank, ticker }: { rank: RankInfo; ticker: string }) {
       <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
         <strong className="text-text-secondary">What this means:</strong> the model
         ranks {ticker} at position #{r1m} by predicted 1-month return — this is
-        the metric our ensemble is strongest at (Sharpe 1.45 on Top-20 back-test).
-        The dollar price forecast below is directional; 1-month median absolute
-        error is ±12%, so use rank tier for conviction, not the exact target price.
+        the metric our ensemble is strongest at (Sharpe {MODEL_METRICS.top20_sharpe.toFixed(2)} on
+        Top-20 back-test). The dollar price forecast below is directional;
+        1-month median absolute error is ±{MODEL_METRICS.mape_22d_pct.toFixed(0)}%,
+        so use rank tier for conviction, not the exact target price.
       </p>
     </div>
   )

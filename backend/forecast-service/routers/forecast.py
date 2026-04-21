@@ -247,6 +247,8 @@ async def get_forecast(
 @router.get("/{ticker}/rank")
 async def get_ticker_rank(
     ticker: str,
+    user_id: uuid.UUID = Depends(require_user_id),
+    x_user_tier: str = Header("free"),
     session: AsyncSession = Depends(get_read_session),
 ) -> dict:
     """Return the ticker's position in the 346-ticker catalog, ranked by
@@ -256,51 +258,68 @@ async def get_ticker_rank(
     stocks — as opposed to absolute price prediction (MAPE 12% at 1-month is
     too wide to anchor on). Rank 1 = strongest predicted performer.
     """
+    from sqlalchemy import func
+
     from shared.models.forecast import Forecast
 
     ticker_upper = ticker.upper()
 
-    # Pull all latest forecasts once, rank client-side — cheaper than 3 window
-    # functions and handles null values transparently.
-    rows = (await session.execute(
+    # Distinguish 404s: ticker not in catalog vs no forecasts yet.
+    if VALID_TICKERS and ticker_upper not in VALID_TICKERS:
+        raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not in supported S&P 500 set")
+
+    # Rate-limit this — cheap read but 3×sort on 346 rows × 1000 RPS still
+    # DoS'able. Reuse the forecast endpoint daily quota (same tier table).
+    await _check_forecast_rate_limit(str(user_id), x_user_tier)
+
+    # Single SQL pass with 3 window functions — ~2ms on 346 rows vs the old
+    # 3×Python-side sort approach which was O(3·N log N) per request.
+    # NULLS LAST behaviour: Postgres RANK() already handles nulls; we push them
+    # to the bottom via NULLS LAST so rank is monotonic & meaningful.
+    ranked_subq = (
         select(
             Forecast.ticker,
+            func.rank().over(
+                order_by=Forecast.predicted_return_1d.desc().nullslast()
+            ).label("r1d"),
+            func.rank().over(
+                order_by=Forecast.predicted_return_1w.desc().nullslast()
+            ).label("r1w"),
+            func.rank().over(
+                order_by=Forecast.predicted_return_1m.desc().nullslast()
+            ).label("r1m"),
             Forecast.predicted_return_1d,
             Forecast.predicted_return_1w,
             Forecast.predicted_return_1m,
-        ).where(Forecast.is_latest.is_(True))
-    )).all()
-
-    if not rows:
-        raise HTTPException(status_code=404, detail="No forecasts available")
-
-    def _rank_by(attr: str) -> tuple[int | None, int]:
-        # Rank by value DESC. None values pushed to bottom.
-        sorted_rows = sorted(
-            rows,
-            key=lambda r: (-(getattr(r, attr) if getattr(r, attr) is not None else -1e9)),
         )
-        total_with_value = sum(1 for r in sorted_rows if getattr(r, attr) is not None)
-        for i, r in enumerate(sorted_rows, start=1):
-            if r.ticker == ticker_upper:
-                return i, total_with_value
-        return None, total_with_value
+        .where(Forecast.is_latest.is_(True))
+        .subquery()
+    )
 
-    rank_1d, total = _rank_by("predicted_return_1d")
-    rank_1w, _ = _rank_by("predicted_return_1w")
-    rank_1m, _ = _rank_by("predicted_return_1m")
+    total_stmt = select(func.count()).select_from(ranked_subq)
+    total = (await session.execute(total_stmt)).scalar_one()
+    if total == 0:
+        raise HTTPException(status_code=404, detail="No forecasts available yet — wait for next batch run")
 
-    if rank_1m is None:
-        raise HTTPException(status_code=404, detail=f"No forecast ranking for {ticker_upper}")
+    row_stmt = select(
+        ranked_subq.c.r1d, ranked_subq.c.r1w, ranked_subq.c.r1m,
+        ranked_subq.c.predicted_return_1d,
+        ranked_subq.c.predicted_return_1w,
+        ranked_subq.c.predicted_return_1m,
+    ).where(ranked_subq.c.ticker == ticker_upper)
+    row = (await session.execute(row_stmt)).first()
+
+    if row is None or row.r1m is None or row.predicted_return_1m is None:
+        raise HTTPException(status_code=404, detail=f"No forecast ranking for {ticker_upper} — wait for next batch run")
 
     return {
         "ticker": ticker_upper,
         "total_tickers": total,
-        "rank_1d": rank_1d,
-        "rank_1w": rank_1w,
-        "rank_1m": rank_1m,
+        "rank_1d": row.r1d if row.predicted_return_1d is not None else None,
+        "rank_1w": row.r1w if row.predicted_return_1w is not None else None,
+        "rank_1m": row.r1m,
         # Percentile from the top: rank 1 → 1.0 (top), rank 346 → 0.003
-        "percentile_1m": round(1 - (rank_1m - 1) / max(total, 1), 3) if rank_1m else None,
+        "percentile_1m": round(1 - (row.r1m - 1) / max(total, 1), 3),
     }
 
 

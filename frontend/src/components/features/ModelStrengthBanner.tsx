@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { TrendingUp, Target, Zap, Trophy } from "lucide-react"
+import { TrendingUp, Target, Zap, Trophy, Info } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
 
@@ -81,7 +81,7 @@ export function ModelStrengthBanner() {
           >
             <Tooltip>
               <TooltipTrigger
-                className="-m-1 rounded-md p-1 text-left transition-colors hover:bg-bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
+                className="group -m-1 rounded-md p-1 text-left transition-colors hover:bg-bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
                 aria-label={`${m.label}: ${m.value}. ${m.tooltip}`}
               >
                 <div className="flex items-center gap-1.5">
@@ -89,6 +89,14 @@ export function ModelStrengthBanner() {
                   <p className="text-[10px] uppercase tracking-wider text-text-muted">
                     {m.label}
                   </p>
+                  {/* Info indicator tells the user the number has more context
+                      behind it. Without it, tooltip-triggers look static —
+                      hover/focus affordance was the only cue and that's
+                      invisible on touch screens. */}
+                  <Info
+                    aria-hidden="true"
+                    className="size-3 text-text-muted opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                  />
                 </div>
                 <p className="mt-1 font-mono text-2xl font-medium text-text-primary tabular-nums">
                   {m.value}

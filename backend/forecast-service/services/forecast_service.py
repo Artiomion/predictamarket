@@ -27,39 +27,69 @@ except Exception as exc:
     logger.warning("valid_tickers_load_failed", error=str(exc), path=str(_TICKERS_FILE))
 
 
-async def get_or_create_model_version(session: AsyncSession, checkpoint_name: str = "") -> uuid.UUID:
+# Canonical ensemble-study metrics. Bump these + checkpoint name together on
+# retrain — they're what the frontend's lib/model-metrics.ts mirrors, and what
+# api consumers fetch from GET /forecast/model-version (future).
+# See docs/ENSEMBLE_NOTES.md for provenance of each number.
+_ENSEMBLE_METRICS: dict[str, float | int] = {
+    "mape_1d": 4.78,
+    "mape_22d": 12.49,
+    "diracc_1d": 0.488,   # coin flip at 1 day — don't market
+    "diracc_22d": 0.680,  # strong edge at 1 month — 34σ above chance
+    "top20_sharpe": 1.45,
+    "top20_return_pct": 19.19,
+    "conflong_sharpe": 8.15,
+    "conflong_win_rate": 63.0,
+    "conflong_n_trades": 27,
+    "test_samples": 9200,
+}
+
+
+async def get_or_create_model_version(
+    session: AsyncSession, checkpoint_name: str = "",
+) -> uuid.UUID:
+    """Idempotent upsert of the active ModelVersion row.
+
+    If the active checkpoint changed (retrain, rollback), we update the
+    existing row in place — NEW row would orphan historical forecasts that
+    FK to the old id. If the row exists and checkpoint matches, we still
+    patch `metrics` when it differs from the canonical seed (previous
+    implementation left stale metrics in the DB across retrains — bit us
+    when the old `{mape_1d: 6.1, win_rate: 99.5}` was served to tooling
+    despite the model being fully swapped.)
+    """
+    version = checkpoint_name.replace(".ckpt", "") if checkpoint_name else "tft-unknown"
+    checkpoint_path = f"models/{checkpoint_name}" if checkpoint_name else "unknown"
+
     result = await session.execute(
         select(ModelVersion).where(ModelVersion.is_active.is_(True)).limit(1)
     )
     mv = result.scalar_one_or_none()
-    if mv:
+
+    if mv is None:
+        mv = ModelVersion(
+            version=version,
+            checkpoint_path=checkpoint_path,
+            is_active=True,
+            metrics=dict(_ENSEMBLE_METRICS),
+        )
+        session.add(mv)
+        await session.flush()
         return mv.id
 
-    # Derive version from checkpoint filename (e.g. "tft-epoch=02-val_loss=3.6789.ckpt")
-    version = checkpoint_name.replace(".ckpt", "") if checkpoint_name else "tft-unknown"
-    mv = ModelVersion(
-        version=version,
-        checkpoint_path=f"models/{checkpoint_name}" if checkpoint_name else "unknown",
-        is_active=True,
-        # Metrics from the 3-model ensemble (ep2+ep4+ep5 equal-weight) study
-        # on the post-Oct-2024 test window — see docs/ENSEMBLE_NOTES.md.
-        # DirAcc is computed against prev_close (true direction of future close
-        # relative to today), NOT against day-1-of-forecast curve.
-        metrics={
-            "mape_1d": 4.78,
-            "mape_22d": 12.49,
-            "diracc_1d": 0.488,   # coin flip at 1 day — don't market
-            "diracc_22d": 0.680,  # strong edge at 1 month — 34σ above chance
-            "top20_sharpe": 1.45,
-            "top20_return_pct": 19.19,
-            "conflong_sharpe": 8.15,
-            "conflong_win_rate": 63.0,
-            "conflong_n_trades": 27,
-            "test_samples": 9200,
-        },
-    )
-    session.add(mv)
-    await session.flush()
+    # Existing row — refresh if anything drifted from canonical seed.
+    changed = False
+    if mv.version != version:
+        mv.version = version
+        changed = True
+    if mv.checkpoint_path != checkpoint_path:
+        mv.checkpoint_path = checkpoint_path
+        changed = True
+    if dict(mv.metrics or {}) != _ENSEMBLE_METRICS:
+        mv.metrics = dict(_ENSEMBLE_METRICS)
+        changed = True
+    if changed:
+        await session.flush()
     return mv.id
 
 

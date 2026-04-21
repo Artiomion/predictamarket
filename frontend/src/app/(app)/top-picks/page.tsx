@@ -43,10 +43,10 @@ export default function TopPicksPage() {
             AI-ranked stocks with the highest predicted 1-month returns
           </p>
         </div>
-        {/* Hero callout — the headline metric for this page. 1.45 is a
-            legitimate Sharpe for a quant strategy (hedge fund threshold is
-            ~1.0), so it deserves prominence. Tooltip carries the caveat and
-            is reachable by touch + keyboard (not just desktop hover). */}
+        {/* Hero callout — the headline metric for this page. Sharpe (from
+            MODEL_METRICS) is above the hedge-fund threshold (~1.0), so it
+            deserves prominence. Tooltip carries the caveat and is reachable
+            by touch + keyboard (not just desktop hover). */}
         <Tooltip>
           <TooltipTrigger
             type="button"
@@ -78,8 +78,8 @@ export default function TopPicksPage() {
       </div>
 
       {/* Strategy back-test — shows why the ranking output is actionable,
-          not just a list. 19% return / Sharpe 1.45 on the ensemble study is
-          the product's strongest evidence that the model is doing real work. */}
+          not just a list. Concrete numbers (return, Sharpe) live in
+          MODEL_METRICS; see BacktestSummary for presentation. */}
       <BacktestSummary />
 
       <div className="rounded-card border border-border-subtle bg-bg-surface">

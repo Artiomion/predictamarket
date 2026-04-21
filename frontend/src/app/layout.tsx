@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import { MODEL_METRICS } from "@/lib/model-metrics";
 import "./globals.css";
 
+// SEO metadata sourced from MODEL_METRICS so retrains update the <meta>
+// description that Google indexes without a manual edit here.
 export const metadata: Metadata = {
   title: "PredictaMarket — AI Stock Predictions",
-  description: "AI-powered stock predictions for 346 S&P 500 stocks. Temporal Fusion Transformer with 3-model ensemble consensus — 63% win rate on high-conviction signals.",
+  description: `AI-powered stock predictions for ${MODEL_METRICS.n_tickers} S&P 500 stocks. Temporal Fusion Transformer with 3-model ensemble consensus — ${MODEL_METRICS.conflong_win_rate_pct}% win rate on high-conviction signals.`,
 };
 
 export default function RootLayout({

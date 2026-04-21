@@ -132,9 +132,18 @@ async def evaluate_forecasts(days_back: int = 30) -> dict:
             error_pct = round((predicted_price - actual_price) / actual_price * 100, 2) if actual_price != 0 else 0.0
 
             # Direction: did price move in the direction the signal predicted?
+            # Deadband: moves smaller than 0.3% of current_close are noise,
+            # not signal — mark them None (excluded from DirAcc numerator AND
+            # denominator downstream). Without this, a ticker that closes at
+            # +0.01% after a BUY call counts as a "correct" call, inflating
+            # win rate with randomness. 0.3% is ~0.5× median daily ATR for
+            # large-cap S&P; tune via deadband_bps field if we want per-ticker.
             was_correct = None
             if forecast.signal and forecast.current_close:
-                if forecast.signal == "BUY":
+                move_pct = abs(actual_price - forecast.current_close) / forecast.current_close
+                if move_pct < 0.003:
+                    was_correct = None  # noise — skip from accuracy stats
+                elif forecast.signal == "BUY":
                     was_correct = actual_price > forecast.current_close
                 elif forecast.signal == "SELL":
                     was_correct = actual_price < forecast.current_close

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 import type { Signal, Confidence } from "@/types"
 
 const signalConfig = {
@@ -54,8 +55,11 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
           "don't buy", not "short". Same underlying data, honest framing. */}
       {signal === "BUY" ? "▲ BUY" : signal === "SELL" ? "▽ AVOID" : signal}
       {isHighConfidence && showWinRate && signal === "BUY" && (
-        <span className="text-[10px] opacity-75" title="Consensus BUY back-test: 63% win rate on 27 trades (single test window)">
-          63% WR
+        <span
+          className="text-[10px] opacity-75"
+          title={`Consensus BUY back-test: ${MODEL_METRICS.conflong_win_rate_pct}% win rate on ${MODEL_METRICS.conflong_n_trades} trades (single test window)`}
+        >
+          {MODEL_METRICS.conflong_win_rate_pct}% WR
         </span>
       )}
       {confidence && (

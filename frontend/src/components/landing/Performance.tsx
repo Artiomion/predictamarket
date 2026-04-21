@@ -34,9 +34,13 @@ export function Performance() {
   return (
     <section className="py-24 px-4">
       <div className="mx-auto max-w-6xl">
+        {/* SSR-safe entrance: initial opacity 1 so the content is always
+            visible even if framer's viewport detection fails (happens in
+            automated browsers, throttled tabs, reduced-motion users).
+            Only the subtle y-offset is animated. */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 1, y: 12 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5, ease: "easeOut" }}
           className="text-center"
@@ -53,8 +57,8 @@ export function Performance() {
           {metrics.map((m, i) => (
             <motion.div
               key={m.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 1, y: 12 }}
+              whileInView={{ y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1, duration: 0.4, ease: "easeOut" }}
               className="text-center"
