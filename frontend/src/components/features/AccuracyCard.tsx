@@ -114,21 +114,21 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
           value={data.direction_accuracy}
           suffix="%"
           icon={Target}
-          color={data.direction_accuracy && data.direction_accuracy >= 60 ? "text-success" : "text-text-primary"}
+          color={data.direction_accuracy != null && data.direction_accuracy >= 60 ? "text-success" : "text-text-primary"}
         />
         <MetricCard
           label="MAPE"
           value={data.mape}
           suffix="%"
           icon={BarChart3}
-          color={data.mape && data.mape <= 5 ? "text-success" : "text-text-primary"}
+          color={data.mape != null && data.mape <= 5 ? "text-success" : "text-text-primary"}
         />
         <MetricCard
           label="Signal Win Rate"
           value={data.win_rate}
           suffix="%"
           icon={TrendingUp}
-          color={data.win_rate && data.win_rate >= 60 ? "text-success" : "text-text-primary"}
+          color={data.win_rate != null && data.win_rate >= 60 ? "text-success" : "text-text-primary"}
         />
       </div>
 

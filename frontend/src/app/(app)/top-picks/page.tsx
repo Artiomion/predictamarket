@@ -9,7 +9,9 @@ import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SparkLine, generateSparkData } from "@/components/charts/SparkLine"
 import { BacktestSummary } from "@/components/features/BacktestSummary"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { forecastApi } from "@/lib/api"
+import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
 import { useAuthStore } from "@/store/auth-store"
 import type { TopPick } from "@/types"
 
@@ -43,27 +45,36 @@ export default function TopPicksPage() {
         </div>
         {/* Hero callout — the headline metric for this page. 1.45 is a
             legitimate Sharpe for a quant strategy (hedge fund threshold is
-            ~1.0), so it deserves prominence. Tooltip carries the caveat. */}
-        <div
-          className="flex items-center gap-4 rounded-card border border-border-subtle bg-bg-surface px-4 py-3"
-          title="Top-20 daily-rebalance back-test, 3-model ensemble, 23 trading days post-Oct-2024"
-        >
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted">
-              Strategy Sharpe
-            </p>
-            <p className="font-mono text-2xl font-medium text-success tabular-nums">1.45</p>
-          </div>
-          <div className="h-8 w-px bg-border-subtle" />
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-text-muted">
-              Back-test Return
-            </p>
-            <p className="font-mono text-2xl font-medium text-success tabular-nums">
-              +19.2%
-            </p>
-          </div>
-        </div>
+            ~1.0), so it deserves prominence. Tooltip carries the caveat and
+            is reachable by touch + keyboard (not just desktop hover). */}
+        <Tooltip>
+          <TooltipTrigger
+            type="button"
+            aria-label={`Strategy Sharpe ${MODEL_METRICS.top20_sharpe.toFixed(2)}, back-test return ${MODEL_METRICS.top20_return_display}. ${METRIC_CAVEATS.top20_sharpe}`}
+            className="flex items-center gap-4 rounded-card border border-border-subtle bg-bg-surface px-4 py-3 text-left transition-colors hover:border-success/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
+          >
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                Strategy Sharpe
+              </p>
+              <p className="font-mono text-2xl font-medium text-success tabular-nums">
+                {MODEL_METRICS.top20_sharpe.toFixed(2)}
+              </p>
+            </div>
+            <div aria-hidden="true" className="h-8 w-px bg-border-subtle" />
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                Back-test Return
+              </p>
+              <p className="font-mono text-2xl font-medium text-success tabular-nums">
+                {MODEL_METRICS.top20_return_display}
+              </p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            {METRIC_CAVEATS.top20_sharpe}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Strategy back-test — shows why the ranking output is actionable,

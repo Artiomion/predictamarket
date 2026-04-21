@@ -2,49 +2,45 @@
 
 import { motion } from "framer-motion"
 import { CheckCircle2, Info } from "lucide-react"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 
 /**
  * Model-strength showcase — the things the ensemble is demonstrably good at.
  *
  * Each card is backed by the ep2+ep4+ep5 ensemble study on the post-Oct-2024
- * test window. Numbers are conservative (point estimates, not best-of).
+ * test window. Numbers come from lib/model-metrics.ts (single source of truth).
  */
 const strengths = [
   {
-    title: "Relative ranking (346 stocks)",
-    metric: "Sharpe 1.45",
-    detail:
-      "The model's core competency. Top-20 daily rebalance returned +19.2% vs S&P 500's +7.7% over 23 trading days — hedge-fund-grade risk-adjusted return.",
+    title: `Relative ranking (${MODEL_METRICS.n_tickers} stocks)`,
+    metric: `Sharpe ${MODEL_METRICS.top20_sharpe.toFixed(2)}`,
+    detail: `The model's core competency. Top-20 daily rebalance returned ${MODEL_METRICS.top20_return_display} vs S&P 500's +${MODEL_METRICS.sp500_return_pct}% over ${MODEL_METRICS.test_trading_days} trading days — hedge-fund-grade risk-adjusted return.`,
   },
   {
     title: "3-model consensus filter",
-    metric: "63% win rate",
-    detail:
-      "When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price, the signal backtests at Sharpe 8.15 across 27 trades.",
+    metric: `${MODEL_METRICS.conflong_win_rate_pct}% win rate`,
+    detail: `When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price, the signal backtests at Sharpe ${MODEL_METRICS.conflong_sharpe} across ${MODEL_METRICS.conflong_n_trades} trades.`,
   },
   {
     title: "1-month direction (up/down)",
-    metric: "68% accuracy",
-    detail:
-      "Ensemble DirAcc at 22-trading-day horizon is 68% across 9,200 test samples — ~34σ above a coin flip. Strong signal for \"will this stock be higher or lower in a month\".",
+    metric: `${MODEL_METRICS.diracc_22d_pct}% accuracy`,
+    detail: `Ensemble DirAcc at 22-trading-day horizon is ${MODEL_METRICS.diracc_22d_pct}% across ${MODEL_METRICS.test_samples.toLocaleString()} test samples — ~34σ above a coin flip. Strong signal for "will this stock be higher or lower in a month".`,
   },
   {
     title: "Short-horizon MAPE (1-day)",
-    metric: "4.78% error",
+    metric: `${MODEL_METRICS.mape_1d_pct}% error`,
     detail:
       "Next-day price predictions are accurate within ~5% on average — usable for timing around earnings or event windows.",
   },
   {
     title: "Top-20 vs S&P 500",
-    metric: "+11.46pp alpha",
-    detail:
-      "Ensemble Top-20 daily-rebalance portfolio outperformed the S&P 500 benchmark by 11.46 percentage points over the same test window.",
+    metric: `+${MODEL_METRICS.alpha_vs_sp500_pp}pp alpha`,
+    detail: `Ensemble Top-20 daily-rebalance portfolio outperformed the S&P 500 benchmark by ${MODEL_METRICS.alpha_vs_sp500_pp} percentage points over the same test window.`,
   },
   {
     title: "Data coverage per forecast",
-    metric: "107 signals",
-    detail:
-      "Each prediction ingests 107 features: OHLCV, 15 technicals, 27 SEC financials, 32-dim news-sentiment PCA, 15 macro inputs, earnings surprises, insider flow, and calendar events.",
+    metric: `${MODEL_METRICS.n_features} signals`,
+    detail: `Each prediction ingests ${MODEL_METRICS.n_features} features: OHLCV, 15 technicals, 27 SEC financials, 32-dim news-sentiment PCA, 15 macro inputs, earnings surprises, insider flow, and calendar events.`,
   },
 ]
 

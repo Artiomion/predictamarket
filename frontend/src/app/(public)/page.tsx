@@ -10,15 +10,16 @@ import { Performance } from "@/components/landing/Performance"
 import { Strengths } from "@/components/landing/Strengths"
 import { Pricing } from "@/components/landing/Pricing"
 import { Footer } from "@/components/landing/Footer"
+import { MODEL_METRICS } from "@/lib/model-metrics"
 
 // Metrics from the 3-model ensemble study (ep2+ep4+ep5 equal-weight) on the
-// post-Oct-2024 test window. WR and Return are for the Consensus BUY subset
-// (all 3 models agree lower-80% CI above current close — 27 trades, N=27).
-// Forecasts count is live count in DB, rounded.
+// post-Oct-2024 test window. WR and Return are for the Consensus BUY subset.
+// Forecasts count is live count in DB, rounded. Numbers live in
+// lib/model-metrics.ts (single source of truth).
 const stats = [
-  { value: "63%", label: "Consensus Win Rate" },
-  { value: "+19.2%", label: "Top-20 Return" },
-  { value: "346", label: "S&P 500 Stocks" },
+  { value: `${MODEL_METRICS.conflong_win_rate_pct}%`, label: "Consensus Win Rate" },
+  { value: MODEL_METRICS.top20_return_display, label: "Top-20 Return" },
+  { value: String(MODEL_METRICS.n_tickers), label: "S&P 500 Stocks" },
   { value: "5K+", label: "Forecasts" },
 ]
 
@@ -45,7 +46,7 @@ export default function LandingPage() {
               transition={{ delay: 0.8, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-success"
             >
-              63% Consensus Win Rate
+              {MODEL_METRICS.conflong_win_rate_pct}% Consensus Win Rate
             </motion.span>
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}
@@ -53,7 +54,7 @@ export default function LandingPage() {
               transition={{ delay: 1.0, duration: 0.3, ease: "easeOut" }}
               className="inline-flex items-center rounded-chip border border-border-subtle bg-bg-surface px-3 py-1 font-mono text-xs text-[var(--accent-from)]"
             >
-              Sharpe 8.15 Ensemble
+              Sharpe {MODEL_METRICS.conflong_sharpe} Ensemble
             </motion.span>
           </div>
 
@@ -76,7 +77,7 @@ export default function LandingPage() {
             transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
             className="mx-auto mt-6 max-w-xl text-lg text-text-secondary md:text-xl"
           >
-            107 data signals. 346 S&P 500 stocks. One prediction engine.
+            {MODEL_METRICS.n_features} data signals. {MODEL_METRICS.n_tickers} S&P 500 stocks. One prediction engine.
           </motion.p>
 
           <motion.div

@@ -14,6 +14,8 @@ import { usePriceUpdate } from "@/lib/use-price-update"
 import { PriceChange } from "@/components/ui/price-change"
 import { NumberTransition } from "@/components/ui/number-transition"
 import { PriceFlash } from "@/components/ui/price-flash"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
 import { LiveChart } from "@/components/charts/LiveChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
 import { FinancialsTab } from "@/components/features/FinancialsTab"
@@ -154,13 +156,23 @@ export default function StockPage() {
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{instrument.sector}</Badge>
               <Badge variant="outline">{instrument.exchange}</Badge>
-              <span
-                title="Ensemble back-test (post-Oct-2024): 68% directional accuracy at 22-day horizon across 9,200 samples, Sharpe 1.45 on Top-20 rebalance."
-                className="inline-flex cursor-help items-center gap-1.5 rounded-chip border border-success/20 bg-success/[0.06] px-2 py-0.5 font-mono text-[10px] font-medium text-success"
-              >
-                <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" />
-                Model · 68% 1m DirAcc · Sharpe 1.45
-              </span>
+              <Tooltip>
+                <TooltipTrigger
+                  type="button"
+                  aria-label={`Model strength. ${METRIC_CAVEATS.ticker_chip}`}
+                  className="hidden items-center gap-1.5 rounded-chip border border-success/20 bg-success/[0.06] px-2 py-0.5 font-mono text-[10px] font-medium text-success transition-colors hover:bg-success/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40 md:inline-flex"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-1.5 rounded-full bg-success"
+                  />
+                  Model · {MODEL_METRICS.diracc_22d_pct}% 1m DirAcc · Sharpe{" "}
+                  {MODEL_METRICS.top20_sharpe.toFixed(2)}
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  {METRIC_CAVEATS.ticker_chip}
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>
