@@ -5,99 +5,115 @@ import { TrendingUp, Info } from "lucide-react"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
 /**
- * Back-test summary for the Top-20 daily-rebalance strategy vs buy-and-hold S&P 500.
+ * Live-target strategy card. Publishes the realistic numbers we'll be
+ * measured against once live trading data accumulates — hedge-fund-grade
+ * Sharpe, not back-test-inflated.
  *
- * Numbers sourced from MODEL_METRICS (the single-source-of-truth that
- * lib/model-metrics.ts exports). Presentation-only fields (period, names,
- * descriptions) live here; numeric metrics are referenced by name so a retrain
- * + one edit to MODEL_METRICS updates every surface that reads from it.
- *
- * We intentionally don't render a synthetic equity curve: without the per-day
- * return series in our production DB, any curve would be fabricated. Showing
- * just the endpoints (return, Sharpe, trades) is the honest representation.
+ * Back-test raw numbers are still shown but as SMALL secondary context
+ * inside each block, clearly labelled as "back-test (audit only)". The
+ * primary emphasis is the live target. This card used to lead with the
+ * 8.15 Sharpe / 63% WR / 27 trades back-test numbers; radical-honesty
+ * refactor inverted that hierarchy.
  */
-const BACKTEST = {
-  period: "Nov 2025 — early Apr 2026",
-  trading_days: MODEL_METRICS.test_trading_days,
-  strategy: {
-    name: "Top-20 Daily Rebalance",
-    return_pct: MODEL_METRICS.backtest_top20_return_pct,
-    sharpe: MODEL_METRICS.backtest_top20_sharpe,
-    live_sharpe_target: MODEL_METRICS.live_top20_sharpe,
-    description:
-      "Long top 20 tickers each day by predicted 1-day return, equal-weight, rebalanced at close.",
-  },
-  benchmark: {
-    name: "S&P 500 Buy & Hold",
-    return_pct: MODEL_METRICS.backtest_sp500_return_pct,
-    sharpe: 0.8,
-    description: "Passive long position over the same window.",
-  },
+const STRATEGIES = {
   consensus: {
-    name: "Consensus BUY Only",
-    sharpe: MODEL_METRICS.backtest_consensus_sharpe,
-    win_rate: MODEL_METRICS.backtest_consensus_win_rate_pct,
-    trades: MODEL_METRICS.backtest_consensus_n_trades,
-    live_sharpe_target: MODEL_METRICS.live_consensus_sharpe,
-    live_win_rate_target: MODEL_METRICS.live_consensus_win_rate_pct,
+    name: "Consensus BUY Only (Alpha Signals)",
     description:
       "Long only when all 3 ensemble models place the 80% CI lower bound above current close.",
+    live_sharpe: MODEL_METRICS.live_consensus_sharpe,
+    live_win_rate: MODEL_METRICS.live_consensus_win_rate_pct,
+    backtest_sharpe: MODEL_METRICS.backtest_consensus_sharpe,
+    backtest_win_rate: MODEL_METRICS.backtest_consensus_win_rate_pct,
+    backtest_trades: MODEL_METRICS.backtest_consensus_n_trades,
+  },
+  top20: {
+    name: "Top-20 Daily Rebalance (Top Picks)",
+    description:
+      "Long top 20 tickers each day by predicted 1-day return, equal-weight, rebalanced at close.",
+    live_sharpe: MODEL_METRICS.live_top20_sharpe,
+    live_alpha_pp: MODEL_METRICS.live_alpha_vs_sp500_pp,
+    backtest_sharpe: MODEL_METRICS.backtest_top20_sharpe,
+    backtest_return: MODEL_METRICS.backtest_top20_return_pct,
+    backtest_alpha: MODEL_METRICS.backtest_alpha_vs_sp500_pp,
+  },
+  benchmark: {
+    return: MODEL_METRICS.backtest_sp500_return_pct,
+    sharpe: 0.8,
   },
 }
 
 export function BacktestSummary() {
-  const outperformance = (BACKTEST.strategy.return_pct - BACKTEST.benchmark.return_pct).toFixed(2)
-
   return (
     <div className="rounded-card border border-border-subtle bg-bg-surface p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-heading text-sm font-medium">Strategy Back-test</h3>
+          <h3 className="font-heading text-sm font-medium">Live targets per strategy</h3>
           <p className="mt-0.5 text-xs text-text-muted">
-            3-model ensemble (ep2+ep4+ep5) · {BACKTEST.period} · {BACKTEST.trading_days} trading days
+            Shrunk from {MODEL_METRICS.test_window} back-test · {MODEL_METRICS.test_trading_days} trading
+            days, {MODEL_METRICS.backtest_consensus_n_trades} consensus trades · ensemble ep2+ep4+ep5
           </p>
         </div>
         <TrendingUp className="size-5 text-success" />
       </div>
 
-      {/* Comparison rows */}
       <div className="mt-5 space-y-3">
-        {/* Consensus strategy — the star of the show */}
+        {/* Consensus — the premium filter */}
         <div className="rounded-button border border-success/20 bg-success/5 p-3">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <p className="text-xs font-medium text-success">{BACKTEST.consensus.name}</p>
+              <p className="text-xs font-medium text-success">{STRATEGIES.consensus.name}</p>
               <p className="mt-0.5 text-[11px] text-text-muted">
-                {BACKTEST.consensus.description}
+                {STRATEGIES.consensus.description}
               </p>
             </div>
           </div>
-          <div className="mt-2 flex gap-4 border-t border-success/10 pt-2">
-            <Metric label="Sharpe" value={BACKTEST.consensus.sharpe.toFixed(2)} hero />
-            <Metric label="Win Rate" value={`${BACKTEST.consensus.win_rate.toFixed(0)}%`} />
-            <Metric label="Trades" value={String(BACKTEST.consensus.trades)} muted />
+          <div className="mt-3 flex gap-4 border-t border-success/10 pt-3">
+            <Metric
+              label="Sharpe target"
+              value={`~${STRATEGIES.consensus.live_sharpe.toFixed(1)}`}
+              hero
+            />
+            <Metric
+              label="WR target"
+              value={`~${STRATEGIES.consensus.live_win_rate}%`}
+            />
+            <div className="ml-auto border-l border-border-subtle pl-4 text-right">
+              <p className="text-[9px] uppercase tracking-wider text-text-muted">
+                Back-test (audit only)
+              </p>
+              <p className="font-mono text-[10px] text-text-muted">
+                Sharpe {STRATEGIES.consensus.backtest_sharpe} · WR {STRATEGIES.consensus.backtest_win_rate}% · N=
+                {STRATEGIES.consensus.backtest_trades}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Top-20 — diversified strategy */}
+        {/* Top-20 — diversified ranking strategy */}
         <div className="rounded-button border border-border-subtle bg-bg-elevated/40 p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-text-primary">{BACKTEST.strategy.name}</p>
-            <span className="text-[10px] font-mono text-text-muted">
-              vs S&P 500: <span className="text-success">+{outperformance} pp</span>
-            </span>
+            <p className="text-xs font-medium text-text-primary">{STRATEGIES.top20.name}</p>
           </div>
-          <div className="mt-2 flex gap-4">
+          <p className="mt-0.5 text-[11px] text-text-muted">{STRATEGIES.top20.description}</p>
+          <div className="mt-3 flex gap-4 border-t border-border-subtle pt-3">
             <Metric
-              label="Return"
-              value={`+${BACKTEST.strategy.return_pct.toFixed(2)}%`}
+              label="Sharpe target"
+              value={`~${STRATEGIES.top20.live_sharpe.toFixed(1)}`}
               valueColor="text-success"
             />
-            <Metric label="Sharpe" value={BACKTEST.strategy.sharpe.toFixed(2)} />
+            <Metric
+              label="Alpha vs S&P"
+              value={`~+${STRATEGIES.top20.live_alpha_pp}pp`}
+              valueColor="text-success"
+            />
             <div className="ml-auto border-l border-border-subtle pl-4 text-right">
-              <p className="text-[10px] text-text-muted">S&P 500 same period</p>
-              <p className="font-mono text-xs text-text-secondary">
-                +{BACKTEST.benchmark.return_pct.toFixed(2)}% · Sharpe {BACKTEST.benchmark.sharpe}
+              <p className="text-[9px] uppercase tracking-wider text-text-muted">
+                Back-test (audit only)
+              </p>
+              <p className="font-mono text-[10px] text-text-muted">
+                Sharpe {STRATEGIES.top20.backtest_sharpe} · Return +
+                {STRATEGIES.top20.backtest_return.toFixed(1)}% · +{STRATEGIES.top20.backtest_alpha}pp
+                vs S&P
               </p>
             </div>
           </div>
@@ -107,9 +123,11 @@ export function BacktestSummary() {
       <div className="mt-4 flex items-start gap-2 rounded-button bg-bg-elevated/30 px-3 py-2 text-[10px] leading-relaxed text-text-muted">
         <Info className="size-3 shrink-0 mt-0.5" />
         <p>
-          Single test window, not rolling walk-forward. Past performance on held-out
-          data does not guarantee future results. Back-test assumes zero slippage
-          and commissions; live performance will differ.
+          Live targets are the numbers we commit to delivering. They are derived by
+          applying heuristic shrinkage to back-test results (accounting for small
+          sample, transaction costs, overfitting, regime shift, data-snooping bias).
+          Back-test raw numbers shown only for auditability — they will NOT repeat
+          verbatim in live trading. Past performance does not guarantee future results.
         </p>
       </div>
     </div>
@@ -120,13 +138,11 @@ function Metric({
   label,
   value,
   hero,
-  muted,
   valueColor,
 }: {
   label: string
   value: string
   hero?: boolean
-  muted?: boolean
   valueColor?: string
 }) {
   return (
@@ -139,7 +155,7 @@ function Metric({
       <p
         className={`mt-0.5 font-mono font-medium tabular-nums ${
           hero ? "text-xl text-success" : "text-sm"
-        } ${muted ? "text-text-secondary" : valueColor || "text-text-primary"}`}
+        } ${valueColor || "text-text-primary"}`}
       >
         {value}
       </p>
