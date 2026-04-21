@@ -1,148 +1,218 @@
 # PredictaMarket
 
-AI-powered stock prediction platform for S&P 500. Multimodal ML model (Temporal Fusion Transformer, 107 features) ranks stocks by predicted return with 99.5% win rate on confident signals.
+AI-powered stock-prediction platform for the S&P 500. A Temporal Fusion
+Transformer (3-model ensemble, 107 features) ranks **346 tickers** by
+predicted 1-month return and exposes the rankings through a Next.js
+dashboard and a Pro-gated Alpha Signals feed.
 
-## Architecture
+**Live targets** (what we promise, honest about degradation from back-test):
 
-```
-Frontend (Next.js :3000)
-    ↓
-API Gateway (:8000) — JWT, rate limiting, CORS, request tracing
-    ↓
-┌─────────────┬─────────────┬──────────────┬──────────────┐
-│ Auth :8001  │ Market :8002│ News :8003   │ Forecast:8004│
-│ JWT, OAuth  │ OHLCV, fin  │ RSS, FinBERT │ TFT model    │
-├─────────────┼─────────────┼──────────────┼──────────────┤
-│Portfolio:8005│ Notif :8006 │ EDGAR :8007  │              │
-│ P&L, watch  │ WS, alerts  │ SEC filings  │              │
-└─────────────┴─────────────┴──────────────┴──────────────┘
-    ↓               ↓
-PostgreSQL 15    Redis 7 (cache + pub/sub)
-```
+| Metric                        | Target           |
+|-------------------------------|------------------|
+| Top-20 Sharpe                 | **~1.0**         |
+| Consensus BUY Sharpe          | **~1.3**         |
+| Consensus win rate            | **~55%**         |
+| 22-day directional accuracy   | **~60%**         |
+| Alpha vs S&P 500              | **~+4 pp**       |
+
+Raw back-test numbers are higher (Sharpe 1.45 / 8.15, WR 63% on 27 trades)
+but reflect a single 23-day hold-out — we shrink them for realism. Full
+methodology in [`docs/MODEL.md`](docs/MODEL.md).
+
+---
 
 ## Quick Start
 
+**Prerequisites:** Docker Desktop, Node 20+, Python 3.12, ~8 GB free RAM,
+~2 GB disk for model checkpoints.
+
 ```bash
-# 1. Clone and setup
+# 1. Clone + env
+git clone <repo> && cd PredictaMarket
 cp .env.example .env
-# Edit .env: set JWT_SECRET and INTERNAL_API_KEY (openssl rand -hex 32)
+# Edit .env — set JWT_SECRET and INTERNAL_API_KEY:
+#   openssl rand -hex 32
+# Also set FINNHUB_API_KEY for live charts (free tier from finnhub.io).
 
-# 2. Start infrastructure
-docker compose up -d postgres redis pgadmin
+# 2. Pull model checkpoints (~1.2 GB, gitignored)
+#    Place in models/ directory:
+#      tft-epoch=02-val_loss=8.8051.ckpt
+#      tft-epoch=04-val_loss=9.2586.ckpt
+#      tft-epoch=05-val_loss=9.3008.ckpt
+#    (Other artifacts — config.json, training_dataset_params.pkl,
+#     pca_model.pkl, old_model_sp500_tickers.txt — are in the repo.)
 
-# 3. Initialize database (33+ tables, 9 schemas, auto-runs on first start)
-# init.sql runs automatically via docker-entrypoint-initdb.d/
+# 3. Start the full stack
+docker compose up -d
 
-# 4. Create Python environment
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r backend/requirements-base.txt
-pip install -r backend/forecast-service/requirements.txt  # heaviest (PyTorch + FinBERT)
-
-# 5. Seed data (94 S&P 500 tickers + 5y prices)
-PYTHONPATH=backend python backend/market-data-service/scripts/seed_instruments.py
-
-# 6. Start all 8 services
-PYTHONPATH=backend uvicorn main:app --port 8000 --app-dir backend/api-gateway &
-PYTHONPATH=backend uvicorn main:app --port 8001 --app-dir backend/auth-service &
-PYTHONPATH=backend uvicorn main:app --port 8002 --app-dir backend/market-data-service &
-PYTHONPATH=backend uvicorn main:app --port 8003 --app-dir backend/news-service &
-PYTHONPATH=backend uvicorn main:app --port 8004 --app-dir backend/forecast-service &
-PYTHONPATH=backend uvicorn main:app --port 8005 --app-dir backend/portfolio-service &
-PYTHONPATH=backend uvicorn main:socket_app --port 8006 --app-dir backend/notification-service &
-PYTHONPATH=backend uvicorn main:app --port 8007 --app-dir backend/edgar-service &
-
-# 7. Run tests
-pip install -r tests/requirements.txt
-pytest tests/test_unit.py -v          # 22 unit tests (no infra needed)
-PYTHONPATH=backend pytest tests/ -v   # All 163 tests (requires running services)
+# 4. Start the frontend
+cd frontend
+npm install
+npm run build
+npm run start    # production mode on :3000
 ```
 
-> **Note:** notification-service uses `main:socket_app` (not `main:app`) for Socket.IO support.
+Open **http://localhost:3000** — register a free account, navigate to
+**/stocks/AAPL → Forecast tab**, and you should see a fresh TFT prediction
+in ~10 s.
 
-## Services
+> **Detailed setup, env vars, troubleshooting:** [`docs/SETUP.md`](docs/SETUP.md)
 
-| Service | Port | Endpoints | Key Features |
-|---------|------|-----------|--------------|
-| api-gateway | 8000 | Proxy all | JWT validation, rate limiting (60/300/1000 rpm), CORS, request-id |
-| auth-service | 8001 | 8 | Register, login, Google OAuth, JWT refresh rotation, bcrypt |
-| market-data-service | 8002 | 8 | Instruments, OHLCV history, financials, earnings, insider |
-| news-service | 8003 | 4 | RSS aggregation, FinBERT sentiment, Redis pub/sub |
-| forecast-service | 8004 | 8 | Real TFT inference (~5-6s), top picks, signals, batch |
-| portfolio-service | 8005 | 15 | Portfolios, positions (weighted avg), watchlists, CSV export |
-| notification-service | 8006 | 4 | WebSocket (Socket.IO), price alerts, email notifications |
-| edgar-service | 8007 | 4 | SEC EDGAR XBRL parsing, income/balance/cashflow |
+---
+
+## Project Layout
+
+```
+predictamarket/
+├── backend/                 # 8 FastAPI microservices + shared layer
+│   ├── shared/              # DB, Redis, auth, rate-limit, models
+│   ├── api-gateway/         # :8000 — proxy, JWT, rate limit
+│   ├── auth-service/        # :8001 — JWT + Google OAuth
+│   ├── market-data-service/ # :8002 — OHLCV, financials, earnings
+│   ├── news-service/        # :8003 — RSS + FinBERT sentiment
+│   ├── forecast-service/    # :8004 — TFT inference (main ML path)
+│   ├── portfolio-service/   # :8005 — portfolios, watchlists
+│   ├── notification-service/# :8006 — WebSocket + alerts
+│   └── edgar-service/       # :8007 — SEC EDGAR XBRL
+│
+├── frontend/                # Next.js 14 + TypeScript
+│   └── src/
+│       ├── app/             # App Router routes
+│       ├── components/      # UI + features + layout + charts
+│       ├── lib/             # api, hooks, model-metrics.ts (SSOT)
+│       └── store/           # Zustand
+│
+├── models/                  # TFT checkpoints + config (.ckpt in .gitignore)
+├── airflow/dags/            # 13 scheduled DAGs (prices, news, forecast)
+├── docker/postgres/init.sql # 9 schemas, 33+ tables, indexes
+├── docker-compose.yml
+│
+└── docs/                    # Documentation (this directory)
+    ├── SETUP.md             # Full install + run guide
+    ├── ARCHITECTURE.md      # System design + data flow
+    ├── MODEL.md             # TFT architecture + training + test metrics
+    ├── BACKEND_API.md       # API reference (66 endpoints)
+    └── ENSEMBLE_NOTES.md    # Internal ensemble study notes
+```
+
+---
+
+## How It Works (60 seconds)
+
+```
+                User
+                 │
+                 ▼
+  ┌──────────────────────────────────┐
+  │  Next.js (:3000)                 │  Dashboard · Top Picks · Alpha Signals
+  └──────────────┬───────────────────┘  · /stocks/[ticker] · Portfolio
+                 │
+                 ▼
+  ┌──────────────────────────────────┐
+  │  API Gateway (:8000)             │  JWT validation, rate limit, CORS
+  └──────────────┬───────────────────┘
+                 │
+       ┌─────────┼──────────┬──────────┬──────────┐
+       ▼         ▼          ▼          ▼          ▼
+   auth     market     news        forecast    portfolio
+   :8001    :8002      :8003       :8004       :8005   …and 3 more
+                                     │
+                                     ▼
+             ┌──────────────────────────────┐
+             │  TFT Ensemble (ep2+ep4+ep5)  │  ep5 primary (single-model Top Picks)
+             │  16.3M params, 107 features  │  ep2+ep4+ep5 ensemble (Alpha Signals)
+             └──────────────┬───────────────┘
+                            │
+                            ▼
+              ┌──────────────────────────────┐
+              │  PostgreSQL 15 + Redis 7     │
+              │  9 schemas · pub/sub events  │
+              └──────────────────────────────┘
+                            ▲
+                            │ (every 15 min / 30 min / hourly cron)
+                            │
+              ┌──────────────────────────────┐
+              │  Airflow (:8080)             │  13 DAGs: prices, macro, news,
+              │  — yfinance · RSS · FRED     │  forecasts, earnings, EDGAR, …
+              │  — FinBERT · SEC             │
+              └──────────────────────────────┘
+```
+
+- **Free user** hits `GET /api/forecast/top-picks` → reads from
+  `forecast.forecasts` (populated hourly by `dag_run_forecast` using ep5).
+- **Pro user** hits `GET /api/forecast/alpha-signals` → reads from
+  `forecast.alpha_signals` (populated daily by `dag_alpha_signals` using the
+  3-model ensemble with consensus filter).
+- **Per-ticker** page calls `POST /api/forecast/{ticker}` → on-demand
+  inference (~10 s cold, ~3 s warm) using ep5, stored in DB for future
+  reads.
+
+---
+
+## Services Overview
+
+| Service | Port | Health | Rate limit (Free/Pro/Premium) |
+|---|---|---|---|
+| api-gateway         | 8000 | `/health` | 60 / 300 / 1000 rpm |
+| auth-service        | 8001 | `/health` | N/A |
+| market-data-service | 8002 | `/health` | via gateway |
+| news-service        | 8003 | `/health` | via gateway |
+| forecast-service    | 8004 | `/health` | 1 / 10 / unlimited forecasts/day |
+| portfolio-service   | 8005 | `/health` | via gateway |
+| notification-service | 8006 | `/socket.io/` | via gateway |
+| edgar-service       | 8007 | `/health` | Pro+ only |
+
+Auxiliary: PostgreSQL :5432, Redis :6379, Airflow :8080, pgAdmin :5050.
+
+Full API reference: [`docs/BACKEND_API.md`](docs/BACKEND_API.md)
+
+---
+
+## Key Design Decisions
+
+- **Microservices** so each domain (market data, news, forecast, portfolio)
+  can scale independently and have its own dependency footprint.
+- **TFT direct forward pass** (not `Lightning.predict()`) — `predict()`
+  applies GroupNormalizer inverse transform which produces NaN on
+  out-of-distribution live data.
+- **3-tier pricing gate** on Alpha Signals — the consensus filter is the
+  main value-prop for Pro ($15/mo); Top Picks (Free/Pro) uses the single
+  primary model.
+- **Radical-honesty metrics** — UI publishes *live targets* (shrunk from
+  back-test) not raw back-test numbers. Back-test values live only in
+  tooltips and audit footers. Rationale: [`docs/MODEL.md`](docs/MODEL.md).
+- **Progressive disclosure** via `<PageGuide>` — every page has a
+  collapsed "New to this page?" panel with plain-English explanation,
+  how-to-use-for-trading instructions, and a glossary.
+
+---
 
 ## Tech Stack
 
-- **Backend:** Python 3.12, FastAPI 0.115, SQLAlchemy 2.0 async, asyncpg
-- **ML:** PyTorch, pytorch-forecasting (TFT), FinBERT, scikit-learn (PCA)
-- **Database:** PostgreSQL 15 (9 schemas, 33 tables)
-- **Cache:** Redis 7 (rate limiting, pub/sub, price cache)
-- **Auth:** JWT (python-jose), bcrypt, Google OAuth
-- **WebSocket:** python-socketio
-- **Monitoring:** Sentry, Prometheus metrics
-- **CI/CD:** GitHub Actions
-- **Container:** Docker Compose
+- **Backend:** Python 3.12, FastAPI 0.115, SQLAlchemy 2.0 async, asyncpg,
+  python-socketio, structlog, Sentry, Prometheus
+- **ML:** PyTorch 2.6, pytorch-forecasting 1.1.1, Lightning 2.5,
+  transformers (FinBERT), scikit-learn (IncrementalPCA)
+- **Data:** PostgreSQL 15, Redis 7, Airflow 2.x
+- **Frontend:** Next.js 14 (App Router), TypeScript strict, Tailwind CSS,
+  Framer Motion, TradingView Lightweight Charts, Zustand, shadcn/ui
+- **Auth:** JWT (python-jose), bcrypt, Google OAuth, Finnhub (real-time prices)
+- **Infra:** Docker Compose, GitHub Actions, optional Sentry
 
-## Environment Variables
+---
 
-```bash
-# Required
-JWT_SECRET=           # openssl rand -hex 32
-INTERNAL_API_KEY=     # openssl rand -hex 32
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/predictamarket
-REDIS_URL=redis://localhost:6379/0
+## Documentation Index
 
-# Optional
-GOOGLE_CLIENT_ID=     # Google OAuth
-GOOGLE_CLIENT_SECRET=
-FRED_API_KEY=         # FRED macro data
-SENTRY_DSN=           # Error tracking
-EMAIL_ENABLED=false   # SendGrid or SMTP
-SENDGRID_API_KEY=
-```
+| Doc | Audience | What it covers |
+|---|---|---|
+| [`docs/SETUP.md`](docs/SETUP.md) | Operators | Full install, env vars, running each service, troubleshooting |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Engineers | All services, DB schema, data flow, scaling notes |
+| [`docs/MODEL.md`](docs/MODEL.md) | ML engineers / investors | TFT architecture, training, test metrics, live vs back-test |
+| [`docs/BACKEND_API.md`](docs/BACKEND_API.md) | Frontend devs | 66 endpoints, schemas, WebSocket events, rate limits |
+| `CLAUDE.md` | Claude Code sessions | Project context, conventions, caveats |
+| `PLAN.md` | Product | Full spec, screens, DB schemas, roadmap |
 
-## Testing
-
-```bash
-# Unit tests (no infrastructure needed, <1s)
-pytest tests/test_unit.py -v
-
-# Integration tests (requires Docker services running)
-pytest tests/ -v --ignore=tests/test_unit.py
-
-# Full suite: 163 tests (22 unit + 141 integration)
-```
-
-## Data Pipeline
-
-```bash
-# Seed 94 S&P 500 instruments + 5y OHLCV
-python backend/market-data-service/scripts/seed_instruments.py
-
-# Update scripts (run via cron or Airflow)
-python backend/market-data-service/scripts/update_prices.py    # OHLCV (every 15 min)
-python backend/market-data-service/scripts/update_macro.py     # VIX, S&P500, DXY, gold, oil
-python backend/market-data-service/scripts/update_financials.py
-python backend/market-data-service/scripts/update_earnings.py
-python backend/market-data-service/scripts/update_insider.py
-python backend/news-service/scripts/fetch_news.py              # RSS + FinBERT sentiment
-python backend/edgar-service/scripts/fetch_edgar.py
-python backend/forecast-service/scripts/run_batch_forecast.py
-```
-
-## ML Model
-
-- **Architecture:** Temporal Fusion Transformer (16.3M params)
-- **Input:** 107 features (OHLCV, technicals, macro, FinBERT sentiment, SEC financials)
-- **Output:** 7 quantiles × 22 trading days (1 month forecast)
-- **Metrics:** MAPE 6.1%, Win Rate 99.5% (confident signals), Top-20 Return 77.7%
-
-## Documentation
-
-- **`CLAUDE.md`** — Project context, architecture, ML model details, design system
-- **`PLAN.md`** — Full product spec, screens, DB schemas, roadmap
-- **`docs/BACKEND_API.md`** — Complete API reference for frontend (66 endpoints, all schemas, WebSocket events)
+---
 
 ## License
 
