@@ -182,6 +182,49 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
         </div>
       )}
 
+      {/* Extreme-prediction warning. Triggers when the *1-month* return
+          (from backend field OR computed from the 22-day median as fallback)
+          crosses ±MODEL_METRICS.extreme_threshold_pct. Empirically this
+          happens on stocks that rallied 4-16× off their 52-week low — out of
+          the distribution the TFT saw during training. The forecast number
+          is still real model output but the *magnitude* is unreliable
+          because it's extrapolating beyond anything it learned. We surface
+          the caveat so users don't take "-86% in 1 month" as a literal price
+          target — they should fall back to rank tier (which is the metric
+          the ensemble is actually strong at — Sharpe 1.45). */}
+      {(() => {
+        const oneMonth = forecast.forecast["1m"]
+        const ret1m =
+          forecast.predicted_return_1m ??
+          (oneMonth && forecast.current_close
+            ? ((oneMonth.median / forecast.current_close) - 1) * 100
+            : null)
+        if (ret1m == null || Math.abs(ret1m) <= MODEL_METRICS.extreme_threshold_pct) return null
+        return (
+          <div className="flex items-start gap-3 rounded-card border border-warning/30 bg-warning/[0.06] px-4 py-3">
+            <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
+            <div className="text-xs leading-relaxed text-text-secondary">
+              <p className="font-medium text-warning">
+                Extreme 1-month forecast ({ret1m > 0 ? "+" : ""}
+                {ret1m.toFixed(1)}%) — treat the dollar target with caution
+              </p>
+              <p className="mt-1">
+                Magnitudes above ±{MODEL_METRICS.extreme_threshold_pct}% usually come from stocks
+                trading far above their 52-week low — well outside the price range the AI saw during
+                training (2000–2026). The <em>direction</em> is typically a mean-reversion signal
+                worth paying attention to, but the <em>specific price target</em> extrapolates beyond
+                what the model can reliably predict.
+              </p>
+              <p className="mt-1">
+                <strong className="text-text-primary">What to do:</strong> use the rank tier above
+                (that&apos;s the metric our ensemble is strong at — Sharpe {MODEL_METRICS.top20_sharpe.toFixed(2)}) and treat the
+                dollar median as &quot;approximate direction&quot;, not a price target.
+              </p>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Ranking context — what the TFT is actually good at.
           Absolute price prediction has a wide MAPE at 1M; relative ranking
           across the full catalog is where the model generates alpha.

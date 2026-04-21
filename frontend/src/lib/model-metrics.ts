@@ -40,6 +40,14 @@ export const MODEL_METRICS = {
   // Data coverage
   n_tickers: 346,
   n_features: 107,
+
+  // UI thresholds for user-facing warnings
+  // When |predicted_return_1m| exceeds this, flag the forecast as "extreme"
+  // and surface a mean-reversion warning. Empirically these correspond to
+  // stocks trading 4-16× above their 52-week low — out of the distribution
+  // the model saw during training, so dollar targets become unreliable.
+  // Use the rank tier instead of the specific price.
+  extreme_threshold_pct: 30,
 } as const
 
 /**

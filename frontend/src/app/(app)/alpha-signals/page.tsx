@@ -171,6 +171,15 @@ export default function AlphaSignalsPage() {
             ],
           },
           {
+            title: "Why is there no HIGH consensus right now?",
+            body: [
+              "You may notice the feed shows mostly LOW or MEDIUM consensus and no HIGH. That's NOT a bug — it's the 3 models disagreeing more on current market data than they did during training.",
+              "During training (data through early Apr 2026), the median disagreement score between the 3 models was 0.008. Right now it's 0.028 — about 3.5× higher. The HIGH threshold (< 0.005) was calibrated on the training distribution and no live stock currently meets it.",
+              "In plain English: the market you see today is different enough from the 2020-2026 period the AI learned on that the 3 models are having honest disagreements about what will happen next. A LOW consensus signal says \"the AI thinks this one goes up, but don't bet the farm — model uncertainty is elevated\".",
+              "HIGH consensus will return when the market enters a period that looks more like training data (lower volatility, trend-following behaviour) or when we retrain on fresher data.",
+            ],
+          },
+          {
             title: "Honest limitations",
             body: [
               "⚠ Small sample: 27 trades in 23 days. The 63% could drift to 50-55% in live trading.",
