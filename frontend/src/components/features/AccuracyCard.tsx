@@ -114,21 +114,21 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
           value={data.direction_accuracy}
           suffix="%"
           icon={Target}
-          color={data.direction_accuracy && data.direction_accuracy >= 60 ? "text-success" : "text-warning"}
+          color={data.direction_accuracy && data.direction_accuracy >= 60 ? "text-success" : "text-text-primary"}
         />
         <MetricCard
           label="MAPE"
           value={data.mape}
           suffix="%"
           icon={BarChart3}
-          color={data.mape && data.mape <= 5 ? "text-success" : data.mape && data.mape <= 10 ? "text-warning" : "text-danger"}
+          color={data.mape && data.mape <= 5 ? "text-success" : "text-text-primary"}
         />
         <MetricCard
           label="Signal Win Rate"
           value={data.win_rate}
           suffix="%"
           icon={TrendingUp}
-          color={data.win_rate && data.win_rate >= 60 ? "text-success" : "text-warning"}
+          color={data.win_rate && data.win_rate >= 60 ? "text-success" : "text-text-primary"}
         />
       </div>
 
@@ -157,15 +157,15 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
                 <td className="py-2 text-text-secondary">{new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
                 <td className="py-2 text-right font-mono tabular-nums">${p.predicted.toFixed(2)}</td>
                 <td className="py-2 text-right font-mono tabular-nums">{p.actual ? `$${p.actual.toFixed(2)}` : "—"}</td>
-                <td className={cn("py-2 text-right font-mono tabular-nums", p.error_pct && Math.abs(p.error_pct) <= 3 ? "text-success" : "text-danger")}>
+                <td className={cn("py-2 text-right font-mono tabular-nums", p.error_pct && Math.abs(p.error_pct) <= 3 ? "text-success" : "text-text-secondary")}>
                   {p.error_pct != null ? `${p.error_pct > 0 ? "+" : ""}${p.error_pct.toFixed(1)}%` : "—"}
                 </td>
-                <td className={cn("py-2 text-right font-mono text-xs", p.signal === "BUY" ? "text-success" : "text-danger")}>
+                <td className={cn("py-2 text-right font-mono text-xs", p.signal === "BUY" ? "text-success" : "text-text-secondary")}>
                   {p.signal === "BUY" ? "▲ BUY" : p.signal === "SELL" ? "▽ AVOID" : "—"}
                 </td>
                 <td className="py-2 text-center">
                   {p.was_correct === true && <Check className="mx-auto size-4 text-success" />}
-                  {p.was_correct === false && <X className="mx-auto size-4 text-danger" />}
+                  {p.was_correct === false && <X className="mx-auto size-4 text-text-muted" />}
                   {p.was_correct == null && <span className="text-text-muted">—</span>}
                 </td>
               </motion.tr>

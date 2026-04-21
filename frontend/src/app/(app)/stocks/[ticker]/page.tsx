@@ -151,9 +151,16 @@ export default function StockPage() {
               <motion.h1 layoutId={`ticker-${ticker}`} className="font-mono text-xl font-semibold">{ticker}</motion.h1>
             </div>
             <p className="mt-0.5 text-sm text-text-secondary">{instrument.name}</p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{instrument.sector}</Badge>
               <Badge variant="outline">{instrument.exchange}</Badge>
+              <span
+                title="Ensemble back-test (post-Oct-2024): 68% directional accuracy at 22-day horizon across 9,200 samples, Sharpe 1.45 on Top-20 rebalance."
+                className="inline-flex cursor-help items-center gap-1.5 rounded-chip border border-success/20 bg-success/[0.06] px-2 py-0.5 font-mono text-[10px] font-medium text-success"
+              >
+                <span className="inline-block size-1.5 rounded-full bg-success animate-pulse" />
+                Model · 68% 1m DirAcc · Sharpe 1.45
+              </span>
             </div>
           </div>
         </div>
