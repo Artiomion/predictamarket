@@ -133,48 +133,77 @@ export default function AlphaSignalsPage() {
 
       <PageGuide
         defaultOpen
-        summary="High-conviction BUY signals — only when all 3 AI models agree."
+        summary="High-conviction BUY signals — only when all 3 AI models agree. Read the explainer below before trusting the numbers."
         sections={[
           {
-            title: "What this page shows",
+            title: "What this page shows (plain English)",
             body: [
-              "Alpha Signals is a filtered feed of stocks where 3 independent AI checkpoints unanimously agree the price will go up. Specifically: all 3 models must predict that even the bottom of their 80% confidence interval is above the current price.",
-              "These are the strongest signals the system can produce. In back-testing, this filter caught 27 trades over 23 trading days with a 63% win rate.",
+              "Imagine you have 3 expert analysts. They all look at the same stock and independently answer: \"will it go up?\" or \"won't it?\". Alpha Signals ONLY shows stocks where all 3 said \"yes, definitely up\". Not one out of three. Not two. All three at once.",
+              "Technically: we run 3 versions of the same AI model (trained at different checkpoints: ep2, ep4, ep5). Each produces a forecast with an 80% confidence interval (the price range the AI is 80% sure the stock will fall into). A stock only appears here when even the LOWER bound of all 3 forecasts is above today's price. In other words: \"even if we're wrong on the pessimistic side, the stock still goes up\".",
+              "This is the strictest filter in the product. Most days the feed is sparse or empty — that's by design. It's rare for 3 models to all agree that strongly.",
+            ],
+          },
+          {
+            title: "What \"63% Win Rate on 27 trades\" means",
+            body: [
+              "Win Rate = percentage of past recommendations that made money. \"63% win rate\" means: out of all past Alpha Signal picks in our back-test, 63% went up (made profit), 37% went down (lost money).",
+              "For context: random coin-flipping = 50%. The average active hedge fund = 52-55%. Warren Buffett over 50 years ≈ 65-70%. So 63% on clean buy signals is genuinely good — BUT…",
+              "\"27 trades\" is the number of signals the filter produced during our 23-trading-day test window. 27 is a SMALL sample. Statistically, if you flip a coin 27 times and get heads 17 out of 27 (63%), you can't confidently claim the coin is biased — that's still within random range. On 1000 flips you could. On 27, it's not definitive.",
+              "We're honest about this: the guide, tooltips, and even the chip copy explicitly says \"27 trades\". When this number grows to 500+ in live production, we'll have a much more reliable win rate.",
+            ],
+          },
+          {
+            title: "What \"Sharpe 8.15\" means",
+            body: [
+              "Sharpe ratio = how much you earned per unit of risk. Formula: average return ÷ volatility of returns. It tells you if gains were smooth or if you took huge rollercoasters to get them.",
+              "Typical benchmarks: Sharpe 0.5 = S&P 500 index fund (mediocre). 1.0 = hedge-fund threshold. 2.0 = excellent manager. 3.0+ = elite (Medallion Fund ~2-3). 8.15 = essentially impossible to sustain in real trading over the long term.",
+              "Why do we show 8.15 then? Because that's what the back-test actually produced on those 27 trades. Sharpe is very sensitive to sample size — on a short window with lucky picks, it can spike like this. When our live trading record grows to 1000+ trades, we fully expect Sharpe to settle in the 2-3 range (still excellent, just not supernatural).",
+              "Bottom line: 8.15 is real back-test math, not marketing. But it will NOT repeat in live trading. Treat it as \"this strategy has a strong edge\", not \"I'll earn 800% this year\".",
             ],
           },
           {
             title: "How to use it for trading",
             body: [
-              "Treat these as your highest-conviction watchlist. The AI is saying \"I'm not just optimistic, I'm confident\" on each one.",
-              "Typical workflow: check Alpha Signals once a day → open each ticker → verify the fundamentals with the Financials and News tabs → only then consider position sizing. Don't batch-buy the entire feed blindly.",
-              "Feed may be empty on some days — that's the filter working correctly. If no stocks pass the consensus bar, the honest answer is \"no high-conviction opportunities today\". Toggle \"All signals\" to see the less-certain ones.",
+              "Check the feed once a day (it refreshes every 5 minutes). Don't panic if it's empty — that means the AI doesn't see high-conviction opportunities today. Empty feed is better than forced picks.",
+              "When signals appear: DON'T batch-buy everything. For each ticker, open News and Insiders tabs to check for disconfirming evidence (insider selling? bad earnings? regulatory issues?). Only then consider buying.",
+              "Position sizing: no more than 2–5% of your portfolio in any single Alpha Signal. A 63% win rate means 37% are losers — diversification is mandatory.",
+              "Horizon: these are ~1-month predictions. Not day-trading signals. Set a stop-loss (e.g. -10%) and hold for the predicted horizon unless a catalyst changes.",
             ],
           },
           {
-            title: "Important caveats",
+            title: "Honest limitations",
             body: [
-              "Back-test was 27 trades in a single 23-day window — small sample. The 63% win rate could drift in live trading.",
-              "The 3 ensemble models are epochs of one training run (not independent seeds), so their \"agreement\" isn't as diversified as the name suggests.",
-              "We do NOT publish SELL (short) signals — the model's short back-test lost money. Alpha Signals is long-only.",
+              "⚠ Small sample: 27 trades in 23 days. The 63% could drift to 50-55% in live trading.",
+              "⚠ Single test window: Nov 2025 — early Apr 2026. One market regime. Not a rolling walk-forward evaluation.",
+              "⚠ The 3 \"independent\" models are actually 3 epochs of ONE training run (not 3 separate seeds). Their agreement isn't as diverse as the word \"consensus\" suggests.",
+              "⚠ Long-only: we don't publish SELL/short signals — the model's short back-test lost money, so we intentionally don't include them here.",
             ],
           },
         ]}
         glossary={[
           {
             term: "Consensus BUY",
-            definition: "All 3 models predict lower-80% CI above current price. Strictest filter.",
+            definition: "All 3 AI models predict even the 80%-lower bound is above current price. Strictest filter possible.",
+          },
+          {
+            term: "Win Rate 63%",
+            definition: "Out of past Alpha Signals in the back-test, 63% made money. 27-trade sample — small but real.",
           },
           {
             term: "Sharpe 8.15",
-            definition: "Back-test Sharpe of the Consensus BUY subset only. Extreme number due to small sample.",
-          },
-          {
-            term: "Disagreement score",
-            definition: "How much the 3 models differ. Lower = stronger agreement.",
+            definition: "Return per unit of risk. Extreme value inflated by small sample; expect ~2-3 in live trading.",
           },
           {
             term: "80% CI",
-            definition: "Range the AI is 80% confident the price falls within. Upper and lower bounds shown per horizon.",
+            definition: "80% confidence interval — range the AI is 80% sure the price will fall into. Upper and lower bounds.",
+          },
+          {
+            term: "Disagreement score",
+            definition: "How much the 3 models differ in their median prediction. Lower = stronger agreement.",
+          },
+          {
+            term: "HIGH consensus",
+            definition: "Disagreement score below threshold — the 3 models are tightly aligned. Top tier.",
           },
         ]}
       />
@@ -183,7 +212,7 @@ export default function AlphaSignalsPage() {
       <div className="rounded-card border border-border-subtle bg-bg-surface/40 px-4 py-3 text-xs text-text-muted flex items-start gap-2">
         <Info className="size-3.5 shrink-0 mt-0.5" />
         <p>
-          Signals expire every 2 hours. Back-test performance based on single test window (post Oct 2024) —
+          Signals expire every 2 hours. Back-test performance based on single test window (post Oct 2025) —
           past performance does not guarantee future results. This is not financial advice.
         </p>
       </div>
