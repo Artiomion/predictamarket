@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { SignalBadge } from "@/components/ui/signal-badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
+import { PageGuide } from "@/components/ui/page-guide"
 import { forecastApi } from "@/lib/api"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 import { useAuthStore } from "@/store/auth-store"
@@ -129,6 +130,54 @@ export default function AlphaSignalsPage() {
           </button>
         </div>
       </div>
+
+      <PageGuide
+        defaultOpen
+        summary="High-conviction BUY signals — only when all 3 AI models agree."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "Alpha Signals is a filtered feed of stocks where 3 independent AI checkpoints unanimously agree the price will go up. Specifically: all 3 models must predict that even the bottom of their 80% confidence interval is above the current price.",
+              "These are the strongest signals the system can produce. In back-testing, this filter caught 27 trades over 23 trading days with a 63% win rate.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "Treat these as your highest-conviction watchlist. The AI is saying \"I'm not just optimistic, I'm confident\" on each one.",
+              "Typical workflow: check Alpha Signals once a day → open each ticker → verify the fundamentals with the Financials and News tabs → only then consider position sizing. Don't batch-buy the entire feed blindly.",
+              "Feed may be empty on some days — that's the filter working correctly. If no stocks pass the consensus bar, the honest answer is \"no high-conviction opportunities today\". Toggle \"All signals\" to see the less-certain ones.",
+            ],
+          },
+          {
+            title: "Important caveats",
+            body: [
+              "Back-test was 27 trades in a single 23-day window — small sample. The 63% win rate could drift in live trading.",
+              "The 3 ensemble models are epochs of one training run (not independent seeds), so their \"agreement\" isn't as diversified as the name suggests.",
+              "We do NOT publish SELL (short) signals — the model's short back-test lost money. Alpha Signals is long-only.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "Consensus BUY",
+            definition: "All 3 models predict lower-80% CI above current price. Strictest filter.",
+          },
+          {
+            term: "Sharpe 8.15",
+            definition: "Back-test Sharpe of the Consensus BUY subset only. Extreme number due to small sample.",
+          },
+          {
+            term: "Disagreement score",
+            definition: "How much the 3 models differ. Lower = stronger agreement.",
+          },
+          {
+            term: "80% CI",
+            definition: "Range the AI is 80% confident the price falls within. Upper and lower bounds shown per horizon.",
+          },
+        ]}
+      />
 
       {/* Disclaimer */}
       <div className="rounded-card border border-border-subtle bg-bg-surface/40 px-4 py-3 text-xs text-text-muted flex items-start gap-2">

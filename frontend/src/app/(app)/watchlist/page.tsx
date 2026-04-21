@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SparkLine, generateSparkData } from "@/components/charts/SparkLine"
+import { PageGuide } from "@/components/ui/page-guide"
 import { portfolioApi, marketApi } from "@/lib/api"
 import type { Watchlist, Instrument, TickerPrice } from "@/types"
 
@@ -132,6 +133,33 @@ export default function WatchlistPage() {
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-2xl font-semibold">Watchlist</h1>
+
+      <PageGuide
+        summary="Track stocks you're thinking about — without buying yet."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "A simple list of tickers you want to monitor. Each row shows the current price, the AI's latest signal (BUY/AVOID/HOLD), and a quick 30-day sparkline.",
+              "Unlike Portfolio, you don't enter a buy price — this is just a shortlist of \"stocks I'm watching\".",
+            ],
+          },
+          {
+            title: "How to use it",
+            body: [
+              "Add a ticker by typing in the search box (autocomplete will suggest names). Or from any stock page, click the star icon to add to your default watchlist.",
+              "Use it as a holding area between \"I noticed this stock\" and \"I'm ready to buy\". When the AI signal flips to BUY + HIGH confidence, that's a possible entry trigger.",
+              "Combine with Price Alerts (from a ticker page) to get notified when something actually happens.",
+            ],
+          },
+          {
+            title: "Tier limits",
+            body: [
+              "Free: 1 watchlist. Pro: 5 watchlists. Premium: 10 watchlists.",
+            ],
+          },
+        ]}
+      />
 
       <div className="relative max-w-sm">
         <Input placeholder="Add ticker (e.g. AAPL)..." value={tickerInput} onChange={(e) => setTickerInput(e.target.value)} onKeyDown={handleKeyDown} />

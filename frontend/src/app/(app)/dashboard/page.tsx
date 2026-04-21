@@ -10,6 +10,7 @@ import { LatestSignals } from "@/components/features/LatestSignals"
 import { MarketNews } from "@/components/features/MarketNews"
 import { ModelStrengthBanner } from "@/components/features/ModelStrengthBanner"
 import { MarketStatusBanner } from "@/components/ui/market-status"
+import { PageGuide } from "@/components/ui/page-guide"
 import { marketApi } from "@/lib/api"
 
 // Sector proxies — each ticker must exist in our 346-ticker S&P 500 subset.
@@ -98,6 +99,51 @@ export default function DashboardPage() {
       </div>
 
       <MarketStatusBanner />
+
+      <PageGuide
+        summary="Your daily starting point — AI-ranked stocks, market snapshot, and fresh news."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "The Dashboard is your home base. It combines three data streams: the AI's top stock picks for the day, a snapshot of how major sectors (tech, financials, energy, etc.) are performing right now, and the latest financial news with AI-analysed sentiment.",
+              "Everything on this page refreshes automatically as fresh prices and news come in — no need to reload.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "Start each morning here. The Top Picks list on the left shows 5 stocks the AI thinks have the highest chance of going up over the next month. Click any ticker to see the full forecast.",
+              "Use the Market Overview cards to check whether the market is up or down overall — if tech is red but your Top Pick is NVDA, that's important context.",
+              "Scroll down to Market News to see what's moving the market right now, coloured by sentiment (green = positive, red = negative).",
+            ],
+          },
+          {
+            title: "What to do next",
+            body: [
+              "1. Scan the Top Picks → click the ticker that interests you. 2. Open the Forecast tab to see the AI's detailed prediction. 3. Check News for catalyst events. 4. Add to Watchlist to track it over time.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "Sharpe Ratio",
+            definition: "Measures return relative to risk. Above 1.0 is good; above 2.0 is excellent; our back-test is 1.45.",
+          },
+          {
+            term: "1m Return",
+            definition: "Predicted percentage change in the stock's price over the next ~22 trading days (one month).",
+          },
+          {
+            term: "BUY / AVOID / HOLD",
+            definition: "BUY = AI expects price to rise. AVOID = expects drop (we don't recommend shorting). HOLD = no strong signal.",
+          },
+          {
+            term: "HIGH / MEDIUM / LOW",
+            definition: "Confidence in the signal. HIGH = the AI's 80% confidence interval is fully above/below the current price.",
+          },
+        ]}
+      />
 
       <ModelStrengthBanner />
 

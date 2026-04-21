@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { PortfolioDetail } from "@/components/features/PortfolioDetail"
+import { PageGuide } from "@/components/ui/page-guide"
 import { portfolioApi } from "@/lib/api"
 import type { Portfolio } from "@/types"
 
@@ -94,6 +95,47 @@ export default function PortfolioPage() {
           </Button>
         )}
       </div>
+
+      <PageGuide
+        summary="Track what you own and how it's performing."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "Your own portfolio — stocks you own, at what price you bought them, and the current unrealized profit or loss. Track multiple portfolios (e.g., \"Long-term\", \"Speculative\", \"401k\") separately.",
+              "Nothing is shared with the AI training pipeline. Your holdings are private, server-side only.",
+            ],
+          },
+          {
+            title: "How to use it",
+            body: [
+              "Create a portfolio → add positions (ticker + quantity + buy price) → the system computes P&L using live prices. No broker integration; you enter everything manually.",
+              "Use this to see which of your positions the AI currently flags as BUY, AVOID, or HOLD. It's a reality-check against your own convictions.",
+              "You can also log transactions (buys/sells) over time to build a real track record.",
+            ],
+          },
+          {
+            title: "Tier limits",
+            body: [
+              "Free: 1 portfolio, 10 positions max. Pro: 5 portfolios, unlimited positions. Premium: 10 portfolios + CSV export.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "Unrealized P&L",
+            definition: "Profit/loss if you sold everything right now. \"Paper\" gain or loss.",
+          },
+          {
+            term: "Realized P&L",
+            definition: "Profit/loss from positions you've already closed. Actual money made or lost.",
+          },
+          {
+            term: "Sector allocation",
+            definition: "% of your portfolio in each sector. Helps spot concentration risk.",
+          },
+        ]}
+      />
 
       {portfolios.length === 0 ? (
         <motion.div

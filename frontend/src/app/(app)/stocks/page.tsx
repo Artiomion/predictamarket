@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { FilterChip } from "@/components/ui/filter-chip"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageGuide } from "@/components/ui/page-guide"
 import { PriceChange } from "@/components/ui/price-change"
 import { formatMarketCap } from "@/lib/formatters"
 import { marketApi } from "@/lib/api"
@@ -105,6 +106,48 @@ export default function StocksPage() {
           <span className="text-sm text-text-muted">({total})</span>
         </div>
       </div>
+
+      <PageGuide
+        summary="Browse the full catalog of 346 stocks our AI can forecast."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "This is the complete list of stocks our AI was trained on — all 346 of them, drawn from the S&P 500. You can filter by sector, search by ticker or company name, and sort by price, market cap, or alphabetically.",
+              "Prices and % changes update in real time during market hours (9:30 AM – 4:00 PM ET).",
+            ],
+          },
+          {
+            title: "How to use it",
+            body: [
+              "Looking for a specific stock? Use the search box — type \"AAPL\" or \"Apple\" and it filters instantly.",
+              "Want to explore a sector? Click a chip (Technology, Healthcare, Energy, etc.). The list filters down to just that sector.",
+              "Click any ticker row to open the detailed view with chart, AI forecast, financials, news, earnings, and insider trading.",
+            ],
+          },
+          {
+            title: "Why only 346 stocks?",
+            body: [
+              "Our AI was trained on historical data for 400 stocks. 346 of them are in the current S&P 500 (the intersection). Stocks NOT in this list can't be forecasted — you'd get a 404.",
+              "For comparison: Bloomberg covers thousands of tickers, Yahoo Finance covers ~60,000. We're focused on quality over quantity — the S&P 500 is the best-documented, most liquid, most researchable universe.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "Market Cap",
+            definition: "Total value of all shares (price × shares outstanding). 'T' = trillion, 'B' = billion.",
+          },
+          {
+            term: "Sector",
+            definition: "Industry classification from S&P (Technology, Healthcare, Financial Services, etc.).",
+          },
+          {
+            term: "Change %",
+            definition: "Price change since yesterday's close. Green = up, red = down.",
+          },
+        ]}
+      />
 
       <div className="space-y-3">
         <div className="relative max-w-sm">

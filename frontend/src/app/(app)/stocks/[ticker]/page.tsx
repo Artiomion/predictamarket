@@ -15,6 +15,7 @@ import { PriceChange } from "@/components/ui/price-change"
 import { NumberTransition } from "@/components/ui/number-transition"
 import { PriceFlash } from "@/components/ui/price-flash"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { PageGuide } from "@/components/ui/page-guide"
 import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
 import { LiveChart } from "@/components/charts/LiveChart"
 import { ForecastTab } from "@/components/features/ForecastTab"
@@ -183,6 +184,57 @@ export default function StockPage() {
           <WatchlistButton ticker={ticker} />
         </div>
       </div>
+
+      <PageGuide
+        summary={`Everything about ${ticker} in one place — chart, AI forecast, fundamentals, news, earnings, insider trading.`}
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "Six tabs, each answering a different question about this stock. Chart = what the price has been doing. Forecast = what the AI thinks it will do. Financials = how healthy the business is. News = what's happening right now. Earnings = when and how the company reports profits. Insiders = whether company executives are buying or selling.",
+              "The green chip in the header (\"Model · 68% 1m DirAcc · Sharpe 1.45\") is the AI's overall track record — not specific to this stock.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "If you're new: open the Forecast tab first. Look at the AI's rank position (e.g., #280 of 346) and the predicted 1-month return. That's the headline.",
+              "Want confidence? Check the 80% and 95% confidence intervals. If the lower bound is above today's price, that's a strong BUY signal.",
+              "Check News for anything that might explain the prediction (earnings beat? regulatory trouble?). Cross-reference with Insider trading — heavy insider selling is a warning flag.",
+              "Still unsure? Add to Watchlist with the star icon and check back in a week.",
+            ],
+          },
+          {
+            title: "Tab-by-tab quick guide",
+            body: [
+              "📊 Chart — live candlesticks with volume. Good for spotting technical patterns.",
+              "🎯 Forecast — AI's prediction for the next 22 trading days with uncertainty bands.",
+              "💰 Financials — income statement and balance sheet. Revenue, earnings, debt.",
+              "📰 News — recent articles tagged with this ticker, coloured by AI-analysed sentiment.",
+              "📅 Earnings — upcoming and past earnings reports. Beat/miss history.",
+              "👥 Insiders — SEC-filed insider buys and sells. Read as a sentiment signal.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "Rank #N / 346",
+            definition: "Where this stock ranks among all 346 by predicted 1-month return. Lower = better.",
+          },
+          {
+            term: "Median forecast",
+            definition: "The AI's best guess. 50% chance the actual price will be above this, 50% below.",
+          },
+          {
+            term: "80% CI",
+            definition: "80% confidence interval — range the AI believes the price will fall within with 80% probability.",
+          },
+          {
+            term: "Bottom quartile",
+            definition: "This stock is in the worst 25% of the catalog by expected return. Don't buy.",
+          },
+        ]}
+      />
 
       <div className="border-b border-border-subtle">
         <div className="flex gap-0 overflow-x-auto">

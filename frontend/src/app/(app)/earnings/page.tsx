@@ -6,6 +6,7 @@ import { motion } from "framer-motion"
 import { CalendarDays } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageGuide } from "@/components/ui/page-guide"
 import { formatCountdown } from "@/lib/formatters"
 import { marketApi } from "@/lib/api"
 import type { EarningsCalendar } from "@/types"
@@ -44,6 +45,52 @@ export default function EarningsPage() {
           {earnings.length} upcoming
         </Badge>
       </div>
+
+      <PageGuide
+        summary="When each company reports its quarterly earnings — and the analyst forecast."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "A chronological list of upcoming earnings reports for stocks in our catalog. For each company: the reporting date, the Wall Street consensus EPS estimate, and a countdown.",
+              "Companies report earnings every 3 months. The numbers they announce usually move the stock price 5–15% in the first 24 hours — up if they beat, down if they miss.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "Day-before earnings: decide whether to hold through the announcement (\"earnings play\") or sell/hedge to avoid the volatility. Our AI doesn't specialise in earnings events — use this as a calendar warning.",
+              "After earnings: check News tab to see the actual result vs. estimate. Sudden negative sentiment after a report = possible entry for contrarians, exit for momentum followers.",
+              "Patterns to watch: 3 beats in a row → strong guidance reputation. 3 misses → investor patience wearing thin.",
+            ],
+          },
+          {
+            title: "Good to know",
+            body: [
+              "EPS Est is the Wall Street consensus. It's what analysts expect; the company reports the actual. The delta between them (\"surprise %\") is what moves the price.",
+              "Reports happen either BMO (before market open, ~8am ET) or AMC (after market close, ~4:30pm ET). Check the specific time before making any trade.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "EPS",
+            definition: "Earnings Per Share = net profit ÷ shares outstanding. Main profitability metric investors watch.",
+          },
+          {
+            term: "EPS Estimate",
+            definition: "Consensus of Wall Street analysts predicting what the company will report.",
+          },
+          {
+            term: "Beat / Miss",
+            definition: "Actual EPS > estimate = beat (stock usually rises). Actual < estimate = miss.",
+          },
+          {
+            term: "Surprise %",
+            definition: "(Actual EPS − Estimate) ÷ Estimate × 100. Bigger surprise = bigger price reaction.",
+          },
+        ]}
+      />
 
       {earnings.length === 0 ? (
         <div className="flex min-h-[40vh] items-center justify-center rounded-card border border-dashed border-border-subtle">

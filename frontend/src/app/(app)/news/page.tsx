@@ -10,6 +10,7 @@ import { FilterChip } from "@/components/ui/filter-chip"
 import { Skeleton } from "@/components/ui/skeleton"
 import { timeAgo, normalizeNewsArticle } from "@/lib/formatters"
 import { SENTIMENT_VARIANTS, IMPACT_STYLES } from "@/lib/constants"
+import { PageGuide } from "@/components/ui/page-guide"
 import { newsApi } from "@/lib/api"
 import type { NewsArticle, Sentiment, Impact } from "@/types"
 import { cn } from "@/lib/utils"
@@ -71,6 +72,54 @@ export default function NewsPage() {
         <h1 className="font-heading text-2xl font-semibold">Market News</h1>
         <span className="text-sm text-text-muted">({total})</span>
       </div>
+
+      <PageGuide
+        summary="Real-time financial news — every article tagged with sentiment and impact."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "Aggregated news from Yahoo Finance, Seeking Alpha, Reuters, and MarketWatch. Updates every 30 minutes.",
+              "Each article is automatically analysed by FinBERT — a specialised AI trained on financial text. It tags each story as positive, negative, or neutral for market impact, and rates the impact as HIGH / MEDIUM / LOW.",
+              "Multi-ticker stories are tagged with every affected ticker so you can filter quickly.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "Check the Impact: HIGH filter first — those are headlines most likely to move stocks.",
+              "Filter by Sentiment: Negative if you're worried about something in your portfolio; Positive if you're scanning for momentum trades.",
+              "Click the ticker badges on any article to jump to that stock's detailed page and see if there's an entry signal.",
+              "Use \"Show summary\" to expand without leaving the feed. Full article link opens the original source.",
+            ],
+          },
+          {
+            title: "A note on sentiment scores",
+            body: [
+              "The 0.0–1.0 score is how confident FinBERT is in its classification. 0.91 negative means \"very likely negative\", 0.55 means \"probably negative but mixed signals\".",
+              "Sentiment is descriptive, not prescriptive. A \"positive\" article about a stock doesn't automatically mean you should buy it — the market may have already priced it in.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "FinBERT",
+            definition: "BERT language model fine-tuned on financial news. Industry-standard for news sentiment.",
+          },
+          {
+            term: "Impact HIGH",
+            definition: "Breaking news or major corporate event. Analyst reports, earnings releases, M&A rumours.",
+          },
+          {
+            term: "Impact LOW",
+            definition: "Routine industry commentary or recap articles. Context, not catalysts.",
+          },
+          {
+            term: "Sentiment score",
+            definition: "0 → neutral, 1 → maximally positive/negative. The colour shows direction.",
+          },
+        ]}
+      />
 
       <div className="flex flex-wrap gap-4">
         <FilterChip options={sentimentFilters} value={sentiment} onChange={setSentiment} label="Sentiment" />

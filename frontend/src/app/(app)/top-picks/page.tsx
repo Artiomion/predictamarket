@@ -9,6 +9,7 @@ import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SparkLine, generateSparkData } from "@/components/charts/SparkLine"
 import { BacktestSummary } from "@/components/features/BacktestSummary"
+import { PageGuide } from "@/components/ui/page-guide"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { forecastApi } from "@/lib/api"
 import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
@@ -76,6 +77,53 @@ export default function TopPicksPage() {
           </TooltipContent>
         </Tooltip>
       </div>
+
+      <PageGuide
+        summary="Daily ranked list of stocks the AI expects to gain the most over the next month."
+        sections={[
+          {
+            title: "What this page shows",
+            body: [
+              "Top Picks is a ranked list of S&P 500 stocks that the AI predicts will have the highest percentage gain over the next ~22 trading days. Every stock shown has a BUY signal (AI thinks it will go up).",
+              "The list is sorted by predicted 1-month return, highest first. Only stocks with positive expected returns appear here — you won't see any losers.",
+            ],
+          },
+          {
+            title: "How to use it for trading",
+            body: [
+              "Think of this as an idea generator, not a portfolio. Pick 3–10 names you want to research deeper — diversify across sectors so you're not all-in on tech.",
+              "Click any row to open the stock's detailed forecast, chart, news, and earnings data. Read before buying.",
+              "The 'Strategy Sharpe 1.45 / +19.2%' number in the top corner shows how the AI's ranking performed in a back-test — hedge-fund level on a 23-day test window.",
+            ],
+          },
+          {
+            title: "Limits to know",
+            body: [
+              `Free accounts see the top 5. Pro ($15/mo) and Premium ($39/mo) see the full 20.`,
+              "Back-test was a single 23-day window, not years of live trading. Past performance does not guarantee future results.",
+              "The AI is better at ranking (\"which stock will outperform which\") than at exact price targets (\"this stock will hit $198.26\"). Use rank tier for conviction, not the dollar figure.",
+            ],
+          },
+        ]}
+        glossary={[
+          {
+            term: "1m Return",
+            definition: "Predicted % change in the stock price over the next ~22 trading days.",
+          },
+          {
+            term: "Sharpe 1.45",
+            definition: "Risk-adjusted return of the back-tested strategy. 1.0 is hedge-fund threshold, 2.0 is elite.",
+          },
+          {
+            term: "Consensus BUY",
+            definition: "Stronger signal — all 3 AI models agree. Available in Alpha Signals (Pro/Premium).",
+          },
+          {
+            term: "7d sparkline",
+            definition: "Recent 7-day price trend for visual context. Not a prediction.",
+          },
+        ]}
+      />
 
       {/* Strategy back-test — shows why the ranking output is actionable,
           not just a list. Concrete numbers (return, Sharpe) live in
