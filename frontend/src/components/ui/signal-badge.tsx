@@ -49,10 +49,11 @@ export function SignalBadge({ signal, confidence, showWinRate, className }: Sign
         className
       )}
     >
-      {signal === "BUY" ? "▲ " : signal === "SELL" ? "▼ " : ""}{signal}
+      {/* Display label — "SELL" is internal signal value but we label it AVOID
+          in UI because the back-tested short strategy loses money. AVOID =
+          "don't buy", not "short". Same underlying data, honest framing. */}
+      {signal === "BUY" ? "▲ BUY" : signal === "SELL" ? "▽ AVOID" : signal}
       {isHighConfidence && showWinRate && signal === "BUY" && (
-        // 63% WR = ConfLong (3-model consensus) historical back-test on post-Oct-2024
-        // window. Old "99.5%" was marketing-hype from 1 model × 185 trades single-test.
         <span className="text-[10px] opacity-75" title="Consensus BUY back-test: 63% win rate on 27 trades (single test window)">
           63% WR
         </span>

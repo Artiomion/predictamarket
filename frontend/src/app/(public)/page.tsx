@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react"
 import { LiveDemo } from "@/components/landing/LiveDemo"
 import { Features } from "@/components/landing/Features"
 import { Performance } from "@/components/landing/Performance"
+import { Strengths } from "@/components/landing/Strengths"
 import { Pricing } from "@/components/landing/Pricing"
 import { Footer } from "@/components/landing/Footer"
 
@@ -117,6 +118,7 @@ export default function LandingPage() {
       <LiveDemo />
       <Features />
       <Performance />
+      <Strengths />
       <Pricing />
       <Footer />
     </>

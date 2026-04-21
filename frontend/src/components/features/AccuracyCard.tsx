@@ -161,7 +161,7 @@ export function AccuracyCard({ ticker }: { ticker: string }) {
                   {p.error_pct != null ? `${p.error_pct > 0 ? "+" : ""}${p.error_pct.toFixed(1)}%` : "—"}
                 </td>
                 <td className={cn("py-2 text-right font-mono text-xs", p.signal === "BUY" ? "text-success" : "text-danger")}>
-                  {p.signal === "BUY" ? "▲ BUY" : p.signal === "SELL" ? "▼ SELL" : "—"}
+                  {p.signal === "BUY" ? "▲ BUY" : p.signal === "SELL" ? "▽ AVOID" : "—"}
                 </td>
                 <td className="py-2 text-center">
                   {p.was_correct === true && <Check className="mx-auto size-4 text-success" />}
