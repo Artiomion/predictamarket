@@ -207,12 +207,12 @@ export default function StockPage() {
           {
             title: "Tab-by-tab quick guide",
             body: [
-              "📊 Chart — live candlesticks with volume. Good for spotting technical patterns.",
-              "🎯 Forecast — AI's prediction for the next 22 trading days with uncertainty bands.",
-              "💰 Financials — income statement and balance sheet. Revenue, earnings, debt.",
-              "📰 News — recent articles tagged with this ticker, coloured by AI-analysed sentiment.",
-              "📅 Earnings — upcoming and past earnings reports. Beat/miss history.",
-              "👥 Insiders — SEC-filed insider buys and sells. Read as a sentiment signal.",
+              "Chart — live candlesticks with volume. Good for spotting technical patterns.",
+              "Forecast — AI's prediction for the next 22 trading days with uncertainty bands.",
+              "Financials — income statement and balance sheet. Revenue, earnings, debt.",
+              "News — recent articles tagged with this ticker, coloured by AI-analysed sentiment.",
+              "Earnings — upcoming and past earnings reports. Beat/miss history.",
+              "Insiders — SEC-filed insider buys and sells. Read as a sentiment signal.",
             ],
           },
         ]}
