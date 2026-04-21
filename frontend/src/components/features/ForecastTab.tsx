@@ -28,8 +28,17 @@ interface ForecastTabProps {
   ticker: string
 }
 
+type RankInfo = {
+  total_tickers: number
+  rank_1d: number | null
+  rank_1w: number | null
+  rank_1m: number | null
+  percentile_1m: number | null
+}
+
 export function ForecastTab({ ticker }: ForecastTabProps) {
   const [forecast, setForecast] = useState<Forecast | null>(null)
+  const [rank, setRank] = useState<RankInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +52,11 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
       .then(({ data }) => setForecast(data))
       .catch(() => setForecast(null))
       .finally(() => setLoading(false))
+    // Fetch ranking in parallel — the "what this model is actually good at"
+    // context. Silent-fail: absence of rank UI shouldn't block forecast view.
+    forecastApi.getTickerRank(ticker)
+      .then(({ data }) => setRank(data))
+      .catch(() => setRank(null))
   }, [ticker])
 
   // Build new forecast
@@ -167,6 +181,14 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
         </div>
       )}
 
+      {/* Ranking context — what the TFT is actually good at.
+          Absolute price prediction has MAPE ~12% at 1M, but relative ranking
+          across the 346-ticker catalog is where the model generates Sharpe 1.45.
+          Showing the rank orients the user to the real signal. */}
+      {rank && rank.rank_1m && (
+        <RankingContext rank={rank} ticker={ticker} />
+      )}
+
       {/* Chart + Signal card */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <ForecastChart forecast={forecast} />
@@ -273,6 +295,75 @@ export function ForecastTab({ ticker }: ForecastTabProps) {
 
       {/* Accuracy */}
       <AccuracyCard ticker={ticker} />
+    </div>
+  )
+}
+
+/** Ranking context block — reframes the forecast tab around what the TFT
+ *  actually excels at (relative ranking with Sharpe 1.45) rather than absolute
+ *  price prediction (MAPE ~12% at 1M). Shown above the forecast chart. */
+function RankingContext({ rank, ticker }: { rank: RankInfo; ticker: string }) {
+  const r1m = rank.rank_1m!
+  const total = rank.total_tickers
+  const isTopDecile = r1m <= Math.ceil(total * 0.1)  // top 10%
+  const isTopQuartile = r1m <= Math.ceil(total * 0.25)
+  const isBottomQuartile = r1m > Math.ceil(total * 0.75)
+
+  let tierLabel: string
+  let tierColor: string
+  if (isTopDecile) {
+    tierLabel = "Top 10%"
+    tierColor = "text-success"
+  } else if (isTopQuartile) {
+    tierLabel = "Top quartile"
+    tierColor = "text-success"
+  } else if (isBottomQuartile) {
+    tierLabel = "Bottom quartile"
+    tierColor = "text-danger"
+  } else {
+    tierLabel = "Mid-pack"
+    tierColor = "text-text-secondary"
+  }
+
+  return (
+    <div className="rounded-card border border-border-subtle bg-bg-surface/50 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-text-muted">
+            AI Ranking Position
+          </p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-medium text-text-primary">
+              #{r1m}
+            </span>
+            <span className="text-sm text-text-secondary">of {total}</span>
+            <span className={`ml-2 text-xs font-medium ${tierColor}`}>
+              {tierLabel}
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-3 text-xs">
+          {rank.rank_1d && (
+            <div className="text-right">
+              <p className="text-text-muted">1D rank</p>
+              <p className="font-mono text-text-secondary">#{rank.rank_1d}</p>
+            </div>
+          )}
+          {rank.rank_1w && (
+            <div className="text-right">
+              <p className="text-text-muted">1W rank</p>
+              <p className="font-mono text-text-secondary">#{rank.rank_1w}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-text-muted">
+        <strong className="text-text-secondary">What this means:</strong> the model
+        ranks {ticker} at position #{r1m} by predicted 1-month return — this is
+        the metric our ensemble is strongest at (Sharpe 1.45 on Top-20 back-test).
+        The dollar price forecast below is directional; 1-month median absolute
+        error is ±12%, so use rank tier for conviction, not the exact target price.
+      </p>
     </div>
   )
 }

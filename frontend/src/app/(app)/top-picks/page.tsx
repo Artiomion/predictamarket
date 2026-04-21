@@ -8,6 +8,7 @@ import { SignalBadge } from "@/components/ui/signal-badge"
 import { PriceChange } from "@/components/ui/price-change"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SparkLine, generateSparkData } from "@/components/charts/SparkLine"
+import { BacktestSummary } from "@/components/features/BacktestSummary"
 import { forecastApi } from "@/lib/api"
 import { useAuthStore } from "@/store/auth-store"
 import type { TopPick } from "@/types"
@@ -39,6 +40,11 @@ export default function TopPicksPage() {
           AI-ranked stocks with the highest predicted returns and confident signals
         </p>
       </div>
+
+      {/* Strategy back-test — shows why the ranking output is actionable,
+          not just a list. 19% return / Sharpe 1.45 on the ensemble study is
+          the product's strongest evidence that the model is doing real work. */}
+      <BacktestSummary />
 
       <div className="rounded-card border border-border-subtle bg-bg-surface">
         <div className="flex items-center gap-2 px-5 pt-5 pb-3">

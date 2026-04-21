@@ -35,7 +35,10 @@ function prettifyPath(path: string): string {
   if (!parts.length) return "PredictaMarket"
   return parts
     .map((seg) => {
-      const isTicker = /^[A-Z.-]{1,6}$/.test(seg.toUpperCase()) && seg.length <= 6
+      // Tickers are ≤ 5 chars (longest in catalog: "CMCSA"). Using ≤5 avoids
+      // collision with the 6-char "stocks" segment being rendered as "STOCKS".
+      // If the segment is short AND all alphabetic/punct, treat as ticker.
+      const isTicker = seg.length <= 5 && /^[a-zA-Z.-]+$/.test(seg)
       if (isTicker) return seg.toUpperCase()
       return seg
         .split("-")

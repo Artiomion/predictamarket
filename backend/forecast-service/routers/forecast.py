@@ -244,6 +244,66 @@ async def get_forecast(
     return data
 
 
+@router.get("/{ticker}/rank")
+async def get_ticker_rank(
+    ticker: str,
+    session: AsyncSession = Depends(get_read_session),
+) -> dict:
+    """Return the ticker's position in the 346-ticker catalog, ranked by
+    predicted return on each horizon.
+
+    This is the metric the TFT is actually good at — *relative* ranking of
+    stocks — as opposed to absolute price prediction (MAPE 12% at 1-month is
+    too wide to anchor on). Rank 1 = strongest predicted performer.
+    """
+    from shared.models.forecast import Forecast
+
+    ticker_upper = ticker.upper()
+
+    # Pull all latest forecasts once, rank client-side — cheaper than 3 window
+    # functions and handles null values transparently.
+    rows = (await session.execute(
+        select(
+            Forecast.ticker,
+            Forecast.predicted_return_1d,
+            Forecast.predicted_return_1w,
+            Forecast.predicted_return_1m,
+        ).where(Forecast.is_latest.is_(True))
+    )).all()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No forecasts available")
+
+    def _rank_by(attr: str) -> tuple[int | None, int]:
+        # Rank by value DESC. None values pushed to bottom.
+        sorted_rows = sorted(
+            rows,
+            key=lambda r: (-(getattr(r, attr) if getattr(r, attr) is not None else -1e9)),
+        )
+        total_with_value = sum(1 for r in sorted_rows if getattr(r, attr) is not None)
+        for i, r in enumerate(sorted_rows, start=1):
+            if r.ticker == ticker_upper:
+                return i, total_with_value
+        return None, total_with_value
+
+    rank_1d, total = _rank_by("predicted_return_1d")
+    rank_1w, _ = _rank_by("predicted_return_1w")
+    rank_1m, _ = _rank_by("predicted_return_1m")
+
+    if rank_1m is None:
+        raise HTTPException(status_code=404, detail=f"No forecast ranking for {ticker_upper}")
+
+    return {
+        "ticker": ticker_upper,
+        "total_tickers": total,
+        "rank_1d": rank_1d,
+        "rank_1w": rank_1w,
+        "rank_1m": rank_1m,
+        # Percentile from the top: rank 1 → 1.0 (top), rank 346 → 0.003
+        "percentile_1m": round(1 - (rank_1m - 1) / max(total, 1), 3) if rank_1m else None,
+    }
+
+
 @router.get("/{ticker}/accuracy")
 async def forecast_accuracy(
     ticker: str,

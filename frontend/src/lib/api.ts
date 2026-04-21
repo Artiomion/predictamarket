@@ -237,6 +237,15 @@ export const forecastApi = {
     api.get(`/api/forecast/batch/${jobId}`),
   getAlphaSignals: (params?: { limit?: number; confident_only?: boolean }) =>
     api.get<AlphaSignal[]>("/api/forecast/alpha-signals", { params }),
+  getTickerRank: (ticker: string) =>
+    api.get<{
+      ticker: string
+      total_tickers: number
+      rank_1d: number | null
+      rank_1w: number | null
+      rank_1m: number | null
+      percentile_1m: number | null
+    }>(`/api/forecast/${ticker}/rank`),
 }
 
 // ── Portfolio API ────────────────────────────────────

@@ -205,26 +205,115 @@ function SignalCard({ signal, index }: { signal: AlphaSignal; index: number }) {
           <ReturnCell label="1m" value={signal.predicted_return_1m} />
         </div>
 
-        {/* Row 3: model consensus */}
-        <div className="mt-3 flex items-center justify-between text-[11px] text-text-muted">
-          <span>
-            Model consensus:{" "}
-            <span className={`font-medium ${consensusColor}`}>{signal.model_consensus}</span>
-          </span>
-          <span className="font-mono">
-            σ={(signal.disagreement_score * 100).toFixed(1)}%
-          </span>
+        {/* Row 3: consensus meter — visual representation of how tightly the
+            3 ensemble models agree. Filled bars = tight agreement, narrow band.
+            Empty bars = wide disagreement, caution warranted. Maps to the
+            disagreement tier thresholds in shared/utils.py. */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[10px] text-text-muted mb-1.5">
+            <span>
+              Model consensus{" "}
+              <span className={`font-medium ${consensusColor}`}>{signal.model_consensus}</span>
+            </span>
+            <span className="font-mono">σ={(signal.disagreement_score * 100).toFixed(1)}%</span>
+          </div>
+          <ConsensusMeter tier={signal.model_consensus} />
         </div>
 
-        {/* Row 4: CI range */}
-        <div className="mt-1 text-[10px] text-text-muted">
-          80% CI:{" "}
-          <span className="font-mono">
-            ${signal.lower_80_1d.toFixed(2)} – ${signal.upper_80_1d.toFixed(2)}
-          </span>
+        {/* Row 4: CI range as visual band (helps user feel uncertainty). */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[10px] text-text-muted mb-1">
+            <span>80% confidence range (1d)</span>
+            <span className="font-mono">
+              ${signal.lower_80_1d.toFixed(2)}–${signal.upper_80_1d.toFixed(2)}
+            </span>
+          </div>
+          <CIRangeBar
+            current={signal.current_close}
+            lower={signal.lower_80_1d}
+            upper={signal.upper_80_1d}
+            median={signal.median_1d}
+          />
         </div>
       </Link>
     </motion.div>
+  )
+}
+
+/** Visual consensus meter — 3 pips representing the 3 ensemble models.
+ *  HIGH: all 3 lit (tight agreement). MEDIUM: 2 lit (moderate disagreement).
+ *  LOW: 1 lit (models diverge — caution). Color-coded. */
+function ConsensusMeter({ tier }: { tier: "HIGH" | "MEDIUM" | "LOW" }) {
+  const filled = tier === "HIGH" ? 3 : tier === "MEDIUM" ? 2 : 1
+  const color =
+    tier === "HIGH"
+      ? "bg-success"
+      : tier === "MEDIUM"
+      ? "bg-warning"
+      : "bg-danger"
+
+  return (
+    <div className="flex gap-1">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className={`h-1.5 flex-1 rounded-full ${
+            i < filled ? color : "bg-bg-elevated border border-border-subtle"
+          }`}
+          aria-label={i < filled ? "Model agrees" : "Model disagrees"}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** Horizontal CI bar — shows the 80% range with current-price marker.
+ *  Visual cue: narrow band = tight ensemble consensus, wide = uncertain. */
+function CIRangeBar({
+  current,
+  lower,
+  upper,
+  median,
+}: {
+  current: number
+  lower: number
+  upper: number
+  median: number
+}) {
+  // Normalize to 0..100 using bar bounds padded 5% beyond [lower, upper]
+  // so current-price marker has room even when outside CI.
+  const bandMin = Math.min(current, lower) * 0.98
+  const bandMax = Math.max(current, upper) * 1.02
+  const range = bandMax - bandMin || 1
+  const pct = (v: number) => Math.max(0, Math.min(100, ((v - bandMin) / range) * 100))
+
+  const lowerPct = pct(lower)
+  const upperPct = pct(upper)
+  const medianPct = pct(median)
+  const currentPct = pct(current)
+
+  return (
+    <div className="relative h-4 w-full rounded-full bg-bg-elevated">
+      {/* CI band */}
+      <div
+        className="absolute top-1 bottom-1 rounded-full bg-gradient-to-r from-[var(--accent-from)]/30 via-[var(--accent-from)]/50 to-[var(--accent-to)]/30"
+        style={{ left: `${lowerPct}%`, width: `${upperPct - lowerPct}%` }}
+      />
+      {/* Median marker */}
+      <div
+        className="absolute top-0 bottom-0 w-0.5 bg-[var(--accent-from)]"
+        style={{ left: `${medianPct}%` }}
+        title={`Predicted median: $${median.toFixed(2)}`}
+      />
+      {/* Current price marker */}
+      <div
+        className="absolute -top-0.5 -bottom-0.5 w-px bg-text-primary"
+        style={{ left: `${currentPct}%` }}
+        title={`Current: $${current.toFixed(2)}`}
+      >
+        <div className="absolute left-1/2 top-0 h-1 w-1 -translate-x-1/2 rounded-full bg-text-primary" />
+      </div>
+    </div>
   )
 }
 
