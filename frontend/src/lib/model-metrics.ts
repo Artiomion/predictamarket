@@ -2,7 +2,7 @@
  * Single source of truth for back-test metrics shown across the product.
  *
  * Every number here is reproducible from the ep2+ep4+ep5 ensemble study on
- * the post-Oct-2024 hold-out window. See:
+ * the post-Oct-2025 hold-out window. See:
  *   - docs/ENSEMBLE_NOTES.md
  *   - backend/forecast-service/services/forecast_service.py (ModelVersion.metrics)
  *
@@ -34,7 +34,7 @@ export const MODEL_METRICS = {
 
   // Test coverage
   test_samples: 9200,
-  test_window: "post-Oct-2024",
+  test_window: "post-Oct-2025",
   test_trading_days: 23,
 
   // Data coverage

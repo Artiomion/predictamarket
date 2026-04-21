@@ -13,7 +13,8 @@ import { Footer } from "@/components/landing/Footer"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
 // Metrics from the 3-model ensemble study (ep2+ep4+ep5 equal-weight) on the
-// post-Oct-2024 test window. WR and Return are for the Consensus BUY subset.
+// post-Oct-2025 test window (Nov 2025 — early Apr 2026). WR and Return are
+// for the Consensus BUY subset.
 // Forecasts count is live count in DB, rounded. Numbers live in
 // lib/model-metrics.ts (single source of truth).
 const stats = [

@@ -7,7 +7,7 @@ import { MODEL_METRICS } from "@/lib/model-metrics"
 /**
  * Model-strength showcase — the things the ensemble is demonstrably good at.
  *
- * Each card is backed by the ep2+ep4+ep5 ensemble study on the post-Oct-2024
+ * Each card is backed by the ep2+ep4+ep5 ensemble study on the post-Oct-2025
  * test window. Numbers come from lib/model-metrics.ts (single source of truth).
  */
 const strengths = [
@@ -60,7 +60,7 @@ export function Strengths() {
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-text-secondary md:text-base">
             Six measurable strengths, backed by the ensemble back-test on the
-            post-Oct-2024 hold-out window. Every number here is reproducible
+            post-Oct-2025 hold-out window. Every number here is reproducible
             from the shipped checkpoints.
           </p>
         </motion.div>

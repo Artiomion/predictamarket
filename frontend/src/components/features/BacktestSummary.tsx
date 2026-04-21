@@ -17,7 +17,7 @@ import { MODEL_METRICS } from "@/lib/model-metrics"
  * just the endpoints (return, Sharpe, trades) is the honest representation.
  */
 const BACKTEST = {
-  period: "Nov 2024 — early Apr 2025",
+  period: "Nov 2025 — early Apr 2026",
   trading_days: MODEL_METRICS.test_trading_days,
   strategy: {
     name: "Top-20 Daily Rebalance",

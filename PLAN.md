@@ -83,7 +83,7 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 | Calendar | days_to_fomc, is_options_expiration, is_quad_witching | hardcoded dates |
 | Cross-asset | beta_spy_20d | computed |
 
-### Текущие метрики качества (ensemble ep2+ep4+ep5, post-Oct-2024 test window, N=9200)
+### Текущие метрики качества (ensemble ep2+ep4+ep5, post-Oct-2025 test window Nov 2025 — early Apr 2026, N=9200)
 
 | Метрика | Значение | Оценка |
 |---|---|---|

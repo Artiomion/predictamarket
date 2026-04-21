@@ -49,7 +49,7 @@ export function Performance() {
             Model Performance
           </h2>
           <p className="mt-3 text-text-secondary">
-            Backtested on S&P 500 data from Nov 2024 — Apr 2026
+            Backtested on S&P 500 data from Nov 2025 — early Apr 2026 (23 trading days)
           </p>
         </motion.div>
 
