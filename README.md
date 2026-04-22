@@ -15,9 +15,10 @@ dashboard and a Pro-gated Alpha Signals feed.
 | 22-day directional accuracy   | **~60%**         |
 | Alpha vs S&P 500              | **~+4 pp**       |
 
-Raw back-test numbers are higher (Sharpe 1.45 / 8.15, WR 63% on 27 trades)
-but reflect a single 23-day hold-out — we shrink them for realism. Full
-methodology in [`docs/MODEL.md`](docs/MODEL.md).
+Raw back-test numbers are higher (ep5-heavy Top-20 Sharpe 1.49 and
+ep2-heavy Consensus WR 64.3% on 28 trades) but reflect a single 23-day
+hold-out — we shrink them for realism. Full methodology in
+[`docs/MODEL.md`](docs/MODEL.md).
 
 ---
 

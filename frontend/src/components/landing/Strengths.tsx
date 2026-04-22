@@ -14,28 +14,27 @@ const strengths = [
   {
     title: `Relative ranking (${MODEL_METRICS.n_tickers} stocks)`,
     metric: `Sharpe ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} live target`,
-    detail: `Top-20 daily-rebalance strategy targets hedge-fund-grade risk-adjusted return in live trading. Back-test on ${MODEL_METRICS.test_trading_days} trading days produced Sharpe ${MODEL_METRICS.backtest_top20_sharpe}; we shrink to ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} realistically after costs, overfitting, and regime shift.`,
+    detail: `Top-20 daily-rebalance with ep5-heavy ensemble [0.2/0.3/0.5] targets hedge-fund-grade risk-adjusted return in live trading. Back-test on ${MODEL_METRICS.test_trading_days} trading days produced Sharpe ${MODEL_METRICS.backtest_top20_sharpe}; shrunk to ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} after costs, overfitting, and regime shift.`,
   },
   {
     title: "3-model consensus filter",
     metric: `~${MODEL_METRICS.live_consensus_win_rate_pct}% win rate live`,
-    detail: `When all 3 ensemble checkpoints (ep2+ep4+ep5) agree that the 80% CI bottom is above current price. Back-test: ${MODEL_METRICS.backtest_consensus_win_rate_pct}% WR on ${MODEL_METRICS.backtest_consensus_n_trades} trades (small sample — expect ~${MODEL_METRICS.live_consensus_win_rate_pct}% in live trading).`,
+    detail: `When all 3 ensemble checkpoints (ep2+ep4+ep5) agree the 80% CI bottom is above current price. Uses ep2-heavy weights [0.5/0.3/0.2] optimised for conviction. Back-test: ${MODEL_METRICS.backtest_consensus_win_rate_pct}% WR on ${MODEL_METRICS.backtest_consensus_n_trades} trades (small sample — expect ~${MODEL_METRICS.live_consensus_win_rate_pct}% in live trading).`,
   },
   {
-    title: "1-month direction (up/down)",
-    metric: `~${MODEL_METRICS.live_diracc_22d_pct}% accuracy live`,
-    detail: `Directional accuracy at 22-trading-day horizon. Back-test on ${MODEL_METRICS.test_samples.toLocaleString()} samples produced ${MODEL_METRICS.backtest_diracc_22d_pct}%; realistic live estimate is ~${MODEL_METRICS.live_diracc_22d_pct}% after regime-shift and overfitting adjustments — still well above the 50% coin-flip baseline.`,
-  },
-  {
-    title: "Short-horizon accuracy (1-day)",
+    title: "Short-horizon MAPE (1-day)",
     metric: `${MODEL_METRICS.backtest_mape_1d_pct}% error (back-test)`,
-    detail:
-      "Next-day price predictions are accurate within ~5% on average in back-test — usable for timing around earnings or event windows. Like all metrics, expect some degradation in live trading.",
+    detail: `Next-day price predictions are accurate within ~${MODEL_METRICS.backtest_mape_1d_pct}% on average across ${MODEL_METRICS.test_samples.toLocaleString()} back-test samples — usable for timing around earnings or event windows. Like all metrics, expect some degradation in live trading.`,
+  },
+  {
+    title: "Longer-horizon MAPE (1-month)",
+    metric: `${MODEL_METRICS.backtest_mape_22d_pct}% error (back-test)`,
+    detail: `1-month price predictions have wider error bands (~±${MODEL_METRICS.backtest_mape_22d_pct.toFixed(0)}%) — don't anchor trades on the exact dollar target. Use the rank tier on the ticker page instead; that's the metric the ensemble is demonstrably strong at.`,
   },
   {
     title: "Top-20 vs S&P 500",
     metric: `~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp alpha target`,
-    detail: `Expected outperformance vs buy-and-hold S&P 500 in live trading. Back-test showed +${MODEL_METRICS.backtest_alpha_vs_sp500_pp}pp on ${MODEL_METRICS.test_trading_days} days; we shrink to ~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp realistically.`,
+    detail: `Expected outperformance vs buy-and-hold S&P 500 in live trading. ep5-heavy ensemble back-test showed +${MODEL_METRICS.backtest_alpha_vs_sp500_pp}pp on ${MODEL_METRICS.test_trading_days} days; shrunk to ~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp realistically.`,
   },
   {
     title: "Data coverage per forecast",

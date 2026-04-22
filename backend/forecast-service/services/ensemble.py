@@ -42,8 +42,24 @@ def _build_dataloader(df: pd.DataFrame, dataset_params):
     return infer_ds.to_dataloader(train=False, batch_size=1, num_workers=0)
 
 
-def _run_ensemble_sync(ticker: str, artifacts, weights: list[float] | None = None) -> dict:
-    """Run 3-model ensemble inference. Returns signal-oriented payload."""
+def _run_ensemble_sync(
+    ticker: str,
+    artifacts,
+    weights: list[float] | None = None,
+    extract_factors: bool = False,
+) -> dict:
+    """Run 3-model ensemble inference. Returns signal-oriented payload.
+
+    :param weights: weighting per model in `artifacts.ensemble_models` order
+        ([ep2, ep4, ep5]). Defaults to equal (1/3, 1/3, 1/3). Production uses:
+          [0.2, 0.3, 0.5]  — "ep5-heavy" for Top Picks (ranking strength)
+          [0.5, 0.3, 0.2]  — "ep2-heavy" for Alpha Signals (WR strength)
+    :param extract_factors: if True, run TFT attention interpretation on the
+        highest-weighted model and include `variable_importance.top_factors`
+        in the result. Needed when storing to `forecast.forecasts` (the
+        forecast_factors FK requires it). Skip for alpha_signals table which
+        doesn't have a factors column — saves ~1s per ticker.
+    """
     artifacts.ensure_ensemble_loaded()
     config = artifacts.config
     dataset_params = artifacts.dataset_params
@@ -62,6 +78,11 @@ def _run_ensemble_sync(ticker: str, artifacts, weights: list[float] | None = Non
 
     infer_dl = _build_dataloader(df, dataset_params)
 
+    # Keep a reference to the raw_output of the highest-weighted model so we
+    # can run attention interpretation on it if extract_factors is True.
+    primary_idx = int(np.argmax(w))
+    primary_raw_output = None
+
     try:
         batch = next(iter(infer_dl))
         x, _ = batch
@@ -69,10 +90,12 @@ def _run_ensemble_sync(ticker: str, artifacts, weights: list[float] | None = Non
         # Run each model — reuse batch, only forward pass changes
         quantiles_per_model = []
         with torch.no_grad():
-            for m in models:
+            for i, m in enumerate(models):
                 out = m(x)
                 q = out["prediction"][0].detach().cpu().numpy()  # (22, 7)
                 quantiles_per_model.append(q)
+                if i == primary_idx and extract_factors:
+                    primary_raw_output = out
     except Exception as e:
         return {"error": f"Ensemble prediction failed: {e}"}
 
@@ -146,12 +169,28 @@ def _run_ensemble_sync(ticker: str, artifacts, weights: list[float] | None = Non
         if current_close else None
     )
 
+    # Extract TFT attention from the highest-weighted model if requested.
+    # This populates forecast_factors when storing to forecast.forecasts
+    # (used by the /stocks/{ticker} page "What Moved the Prediction" card).
+    top_factors: list[dict] = []
+    if extract_factors and primary_raw_output is not None:
+        try:
+            from services.inference import _extract_variable_importance
+            top_factors = _extract_variable_importance(
+                models[primary_idx], infer_dl, config, signal,
+                current_close, median_1d, raw_output=primary_raw_output,
+            )
+        except Exception as exc:
+            structlog.get_logger().warning(
+                "ensemble_factor_extraction_failed", ticker=ticker, error=str(exc),
+            )
+
     elapsed = time.time() - t0
 
     # Individual numeric fields below are already finite floats. The single
     # sanitize_nan wrapper is a defensive net for nested dicts (forecast[horizon])
     # — round() returns NaN-floats if input is NaN, which would break JSON.
-    return sanitize_nan({
+    result = {
         "ticker": ticker.upper(),
         "current_close": round(current_close, 2),
         "signal": signal,
@@ -168,8 +207,18 @@ def _run_ensemble_sync(ticker: str, artifacts, weights: list[float] | None = Non
         "ensemble_n_models": len(models),
         "inference_time_s": round(elapsed, 2),
         "forecast_date": datetime.now().strftime("%Y-%m-%d"),
-    })
+    }
+    if extract_factors:
+        result["variable_importance"] = {"top_factors": top_factors}
+    return sanitize_nan(result)
 
 
-async def run_ensemble(ticker: str, artifacts, weights: list[float] | None = None) -> dict:
-    return await asyncio.to_thread(_run_ensemble_sync, ticker, artifacts, weights)
+async def run_ensemble(
+    ticker: str,
+    artifacts,
+    weights: list[float] | None = None,
+    extract_factors: bool = False,
+) -> dict:
+    return await asyncio.to_thread(
+        _run_ensemble_sync, ticker, artifacts, weights, extract_factors,
+    )

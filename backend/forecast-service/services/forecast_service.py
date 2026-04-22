@@ -31,17 +31,28 @@ except Exception as exc:
 # retrain — they're what the frontend's lib/model-metrics.ts mirrors, and what
 # api consumers fetch from GET /forecast/model-version (future).
 # See docs/ENSEMBLE_NOTES.md for provenance of each number.
-_ENSEMBLE_METRICS: dict[str, float | int] = {
-    "mape_1d": 4.78,
-    "mape_22d": 12.49,
-    "diracc_1d": 0.488,   # coin flip at 1 day — don't market
-    "diracc_22d": 0.680,  # strong edge at 1 month — 34σ above chance
-    "top20_sharpe": 1.45,
-    "top20_return_pct": 19.19,
-    "conflong_sharpe": 8.15,
-    "conflong_win_rate": 63.0,
-    "conflong_n_trades": 27,
+_ENSEMBLE_METRICS: dict[str, str | float | int] = {
+    # Top Picks + per-ticker ranking path uses ep5-heavy [0.2/0.3/0.5].
+    "top_picks_weights": "ep5-heavy [0.2, 0.3, 0.5]",
+    "top_picks_sharpe": 1.49,             # was 1.45 (ENS equal)
+    "top_picks_return_pct": 19.74,        # was 19.19
+    "top_picks_alpha_vs_sp500_pp": 12.01, # was 11.46
+
+    # Alpha Signals uses ep2-heavy [0.5/0.3/0.2].
+    "alpha_weights": "ep2-heavy [0.5, 0.3, 0.2]",
+    "alpha_sharpe": 8.04,                 # was 8.15 (ENS equal)
+    "alpha_win_rate": 64.3,               # was 63.0
+    "alpha_n_trades": 28,                 # was 27
+
+    # Shared MAPE / DirAcc. 22d DirAcc is 52.2% (ep5-heavy) — barely above
+    # the 50% coin-flip baseline. We don't market this as a strength.
+    "mape_1d": 4.75,                      # ep5-heavy
+    "mape_22d": 12.63,                    # ep5-heavy
+    "diracc_1d": 0.481,
+    "diracc_22d": 0.522,                  # was 0.680 — that was a different metric
     "test_samples": 9200,
+    "test_window": "2025-11-01 to 2026-04-02",
+    "test_trading_days": 23,
 }
 
 

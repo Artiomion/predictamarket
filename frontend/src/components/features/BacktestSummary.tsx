@@ -5,21 +5,21 @@ import { TrendingUp, Info } from "lucide-react"
 import { MODEL_METRICS } from "@/lib/model-metrics"
 
 /**
- * Live-target strategy card. Publishes the realistic numbers we'll be
- * measured against once live trading data accumulates — hedge-fund-grade
- * Sharpe, not back-test-inflated.
+ * Live-target strategy card for Top Picks. Two production strategies
+ * are summarised:
  *
- * Back-test raw numbers are still shown but as SMALL secondary context
- * inside each block, clearly labelled as "back-test (audit only)". The
- * primary emphasis is the live target. This card used to lead with the
- * 8.15 Sharpe / 63% WR / 27 trades back-test numbers; radical-honesty
- * refactor inverted that hierarchy.
+ *   Consensus BUY Only (Alpha Signals) — ep2-heavy weights [0.5, 0.3, 0.2]
+ *   Top-20 Daily Rebalance (Top Picks) — ep5-heavy weights [0.2, 0.3, 0.5]
+ *
+ * Each uses the ensemble configuration empirically best for its goal
+ * (conviction vs ranking). See docs/MODEL.md §6 for derivation.
  */
 const STRATEGIES = {
   consensus: {
     name: "Consensus BUY Only (Alpha Signals)",
     description:
       "Long only when all 3 ensemble models place the 80% CI lower bound above current close.",
+    weights: MODEL_METRICS.backtest_consensus_weights,
     live_sharpe: MODEL_METRICS.live_consensus_sharpe,
     live_win_rate: MODEL_METRICS.live_consensus_win_rate_pct,
     backtest_sharpe: MODEL_METRICS.backtest_consensus_sharpe,
@@ -30,15 +30,12 @@ const STRATEGIES = {
     name: "Top-20 Daily Rebalance (Top Picks)",
     description:
       "Long top 20 tickers each day by predicted 1-day return, equal-weight, rebalanced at close.",
+    weights: MODEL_METRICS.backtest_top20_weights,
     live_sharpe: MODEL_METRICS.live_top20_sharpe,
     live_alpha_pp: MODEL_METRICS.live_alpha_vs_sp500_pp,
     backtest_sharpe: MODEL_METRICS.backtest_top20_sharpe,
     backtest_return: MODEL_METRICS.backtest_top20_return_pct,
     backtest_alpha: MODEL_METRICS.backtest_alpha_vs_sp500_pp,
-  },
-  benchmark: {
-    return: MODEL_METRICS.backtest_sp500_return_pct,
-    sharpe: 0.8,
   },
 }
 
@@ -49,8 +46,9 @@ export function BacktestSummary() {
         <div>
           <h3 className="font-heading text-sm font-medium">Live targets per strategy</h3>
           <p className="mt-0.5 text-xs text-text-muted">
-            Shrunk from {MODEL_METRICS.test_window} back-test · {MODEL_METRICS.test_trading_days} trading
-            days, {MODEL_METRICS.backtest_consensus_n_trades} consensus trades · ensemble ep2+ep4+ep5
+            Shrunk from {MODEL_METRICS.test_window} back-test ·{" "}
+            {MODEL_METRICS.test_trading_days} trading days · two ensemble
+            configurations, one per use case
           </p>
         </div>
         <TrendingUp className="size-5 text-success" />
@@ -59,13 +57,19 @@ export function BacktestSummary() {
       <div className="mt-5 space-y-3">
         {/* Consensus — the premium filter */}
         <div className="rounded-button border border-success/20 bg-success/5 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex-1">
               <p className="text-xs font-medium text-success">{STRATEGIES.consensus.name}</p>
               <p className="mt-0.5 text-[11px] text-text-muted">
                 {STRATEGIES.consensus.description}
               </p>
             </div>
+            <span
+              className="shrink-0 rounded-chip border border-success/20 bg-bg-surface/40 px-1.5 py-0.5 font-mono text-[9px] text-success/80"
+              title="Ensemble weights (ep2, ep4, ep5)"
+            >
+              {STRATEGIES.consensus.weights}
+            </span>
           </div>
           <div className="mt-3 flex gap-4 border-t border-success/10 pt-3">
             <Metric
@@ -82,7 +86,8 @@ export function BacktestSummary() {
                 Back-test (audit only)
               </p>
               <p className="font-mono text-[10px] text-text-muted">
-                Sharpe {STRATEGIES.consensus.backtest_sharpe} · WR {STRATEGIES.consensus.backtest_win_rate}% · N=
+                Sharpe {STRATEGIES.consensus.backtest_sharpe} · WR{" "}
+                {STRATEGIES.consensus.backtest_win_rate}% · N=
                 {STRATEGIES.consensus.backtest_trades}
               </p>
             </div>
@@ -91,8 +96,14 @@ export function BacktestSummary() {
 
         {/* Top-20 — diversified ranking strategy */}
         <div className="rounded-button border border-border-subtle bg-bg-elevated/40 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium text-text-primary">{STRATEGIES.top20.name}</p>
+            <span
+              className="shrink-0 rounded-chip border border-border-subtle bg-bg-surface/40 px-1.5 py-0.5 font-mono text-[9px] text-text-muted"
+              title="Ensemble weights (ep2, ep4, ep5)"
+            >
+              {STRATEGIES.top20.weights}
+            </span>
           </div>
           <p className="mt-0.5 text-[11px] text-text-muted">{STRATEGIES.top20.description}</p>
           <div className="mt-3 flex gap-4 border-t border-border-subtle pt-3">
@@ -112,8 +123,8 @@ export function BacktestSummary() {
               </p>
               <p className="font-mono text-[10px] text-text-muted">
                 Sharpe {STRATEGIES.top20.backtest_sharpe} · Return +
-                {STRATEGIES.top20.backtest_return.toFixed(1)}% · +{STRATEGIES.top20.backtest_alpha}pp
-                vs S&P
+                {STRATEGIES.top20.backtest_return.toFixed(1)}% · +
+                {STRATEGIES.top20.backtest_alpha}pp vs S&P
               </p>
             </div>
           </div>

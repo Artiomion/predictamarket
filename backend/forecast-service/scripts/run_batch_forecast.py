@@ -1,5 +1,12 @@
 """
-Batch forecast: run TFT inference for all 94 tickers, store results, publish Redis event.
+Batch forecast: run 3-model ensemble inference with ep5-heavy weights for
+all 346 tickers, store results, publish Redis event.
+
+Weighting rationale: ep5-heavy [0.2, 0.3, 0.5] (for ep2, ep4, ep5 in that
+order) produces the best back-test Top-20 Sharpe (1.49 vs 1.45 ENS equal
+vs 1.36 ep5 alone) — ranking is the value prop for Top Picks, so we
+optimise for that. Alpha Signals use a different ensemble (ep2-heavy);
+see run_alpha_signals.py.
 
 Usage:
   PYTHONPATH=backend .venv/bin/python backend/forecast-service/scripts/run_batch_forecast.py
@@ -24,26 +31,43 @@ from shared.database import async_session_factory
 from shared.logging import setup_logging
 from shared.redis_client import redis_client
 
-from services.inference import run_inference
+from services.ensemble import run_ensemble
 from services.forecast_service import store_forecast
 from services.model_loader import artifacts
 
 setup_logging()
 logger = structlog.get_logger()
 
+# ep5-heavy weights: applied to artifacts.ensemble_models in [ep2, ep4, ep5] order.
+# Back-test metrics (post-Oct-2025, 23 days, 9,200 windows):
+#   Top-20 Sharpe 1.49 · Return +19.74% · vs S&P 500 +12.01pp alpha
+#   MAPE 1d 4.75% · MAPE 22d 12.63%
+# See docs/MODEL.md §6 for ensemble selection rationale.
+EP5_HEAVY_WEIGHTS = [0.2, 0.3, 0.5]
+
 
 async def main() -> None:
-    await logger.ainfo("batch_forecast_start", total_tickers=len(artifacts.valid_tickers))
+    await logger.ainfo(
+        "batch_forecast_start",
+        total_tickers=len(artifacts.valid_tickers),
+        weights=EP5_HEAVY_WEIGHTS,
+    )
 
-    # Load model (blocking, first time)
+    # Load primary + all 3 ensemble checkpoints. Ensemble reuses ep5 from
+    # primary, so total additional RAM is 2× checkpoint (ep2 + ep4).
     await asyncio.to_thread(artifacts.ensure_loaded)
+    await asyncio.to_thread(artifacts.ensure_ensemble_loaded)
 
     success = 0
     failed = 0
 
     for ticker in sorted(artifacts.valid_tickers):
         try:
-            result = await run_inference(ticker, artifacts)
+            result = await run_ensemble(
+                ticker, artifacts,
+                weights=EP5_HEAVY_WEIGHTS,
+                extract_factors=True,  # forecast.forecast_factors FK needs this
+            )
             if "error" in result:
                 await logger.aerror("forecast_error", ticker=ticker, error=result["error"])
                 failed += 1

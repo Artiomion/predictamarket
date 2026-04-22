@@ -226,7 +226,9 @@ async def create_signal_forecast(
 
     await _check_forecast_rate_limit(str(user_id), x_user_tier)
 
-    result = await run_ensemble(ticker_upper, artifacts)
+    # Same weights as dag_alpha_signals batch — ep2-heavy optimises WR for
+    # this Pro-only Alpha Signals path. See docs/MODEL.md §6.
+    result = await run_ensemble(ticker_upper, artifacts, weights=[0.5, 0.3, 0.2])
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return sanitize_nan(result)

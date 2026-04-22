@@ -147,11 +147,18 @@ async def main() -> None:
     if missing:
         await logger.awarning("alpha_missing_instruments", count=len(missing), first_5=missing[:5])
 
+    # ep2-heavy weights (ep2, ep4, ep5) — maximise Consensus WR for Alpha
+    # Signals. Back-test: Sharpe 8.04, WR 64.3%, N=28 (vs ENS equal 8.15/63%/27,
+    # vs ep5-heavy 2.01/54.3%/35). ConfLong WR is the metric users care about
+    # on this surface (high-conviction trades), so we optimise for that
+    # instead of raw Sharpe or ranking quality. See docs/MODEL.md §6.
+    ALPHA_WEIGHTS = [0.5, 0.3, 0.2]
+
     for ticker in tickers:
         if ticker not in inst_map:
             continue
         try:
-            result = await run_ensemble(ticker, artifacts)
+            result = await run_ensemble(ticker, artifacts, weights=ALPHA_WEIGHTS)
             if "error" in result:
                 await logger.aerror("alpha_inference_error", ticker=ticker, error=result["error"])
                 failed += 1

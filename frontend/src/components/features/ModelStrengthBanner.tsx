@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { TrendingUp, Target, Zap, Trophy, Info } from "lucide-react"
+import { TrendingUp, BarChart3, Zap, Trophy, Info } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { MODEL_METRICS, METRIC_CAVEATS } from "@/lib/model-metrics"
 
@@ -18,29 +18,33 @@ const metrics = [
   {
     icon: TrendingUp,
     label: "Top-20 Sharpe target",
-    value: MODEL_METRICS.live_top20_sharpe.toFixed(1),
+    value: `~${MODEL_METRICS.live_top20_sharpe.toFixed(1)}`,
     detail: "Hedge-fund-grade risk-adjusted return (live target)",
     tooltip: METRIC_CAVEATS.live_sharpe,
   },
   {
-    icon: Target,
-    label: "1-month direction",
-    value: `${MODEL_METRICS.live_diracc_22d_pct}%`,
-    detail: "DirAcc at 22-trading-day horizon (live target)",
-    tooltip: METRIC_CAVEATS.live_diracc,
+    icon: BarChart3,
+    label: "Top-20 back-test return",
+    value: MODEL_METRICS.backtest_top20_return_display,
+    detail: `ep5-heavy ensemble · ${MODEL_METRICS.test_trading_days} trading days`,
+    // Explicitly a back-test number — this card is the one place we show a
+    // raw historical figure because it's the most concrete "here's what
+    // the strategy did" claim. Live target is expressed via the Sharpe
+    // metric next to it.
+    tooltip: `Back-test ${MODEL_METRICS.test_window}: Top-20 daily rebalance returned ${MODEL_METRICS.backtest_top20_return_display} vs S&P 500 +${MODEL_METRICS.backtest_sp500_return_pct}% over the same window (+${MODEL_METRICS.backtest_alpha_vs_sp500_pp}pp alpha). Live performance will differ — this is historical hold-out data, not a forward promise.`,
   },
   {
     icon: Trophy,
     label: "Consensus win rate",
-    value: `${MODEL_METRICS.live_consensus_win_rate_pct}%`,
-    detail: `3-model agreement filter · Sharpe ${MODEL_METRICS.live_consensus_sharpe.toFixed(1)}`,
+    value: `~${MODEL_METRICS.live_consensus_win_rate_pct}%`,
+    detail: `3-model agreement filter · Sharpe ~${MODEL_METRICS.live_consensus_sharpe.toFixed(1)}`,
     tooltip: METRIC_CAVEATS.live_consensus_wr,
   },
   {
     icon: Zap,
     label: "Alpha vs S&P 500",
-    value: `+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp`,
-    detail: "Annualised outperformance target",
+    value: `~+${MODEL_METRICS.live_alpha_vs_sp500_pp}pp`,
+    detail: "Outperformance target vs buy-and-hold",
     tooltip: METRIC_CAVEATS.live_alpha,
   },
 ]

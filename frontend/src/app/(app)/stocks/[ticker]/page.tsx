@@ -167,8 +167,7 @@ export default function StockPage() {
                     aria-hidden="true"
                     className="inline-block size-1.5 rounded-full bg-success"
                   />
-                  Model · ~{MODEL_METRICS.live_diracc_22d_pct}% 1m DirAcc · Sharpe ~
-                  {MODEL_METRICS.live_top20_sharpe.toFixed(1)}
+                  Model · Top-20 Sharpe ~{MODEL_METRICS.live_top20_sharpe.toFixed(1)} target
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   {METRIC_CAVEATS.ticker_chip}
@@ -192,7 +191,7 @@ export default function StockPage() {
             title: "What this page shows",
             body: [
               "Six tabs, each answering a different question about this stock. Chart = what the price has been doing. Forecast = what the AI thinks it will do. Financials = how healthy the business is. News = what's happening right now. Earnings = when and how the company reports profits. Insiders = whether company executives are buying or selling.",
-              "The green chip in the header (\"Model · 68% 1m DirAcc · Sharpe 1.45\") is the AI's overall track record — not specific to this stock.",
+              `The green chip in the header ("Model · Top-20 Sharpe ~${MODEL_METRICS.live_top20_sharpe.toFixed(1)} target") is the AI's overall track record — not specific to this stock.`,
             ],
           },
           {

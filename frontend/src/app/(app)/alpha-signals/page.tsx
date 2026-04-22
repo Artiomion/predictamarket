@@ -148,20 +148,20 @@ export default function AlphaSignalsPage() {
             ],
           },
           {
-            title: "Why ~55% Win Rate and not 63%?",
+            title: `Why ~${MODEL_METRICS.live_consensus_win_rate_pct}% Win Rate and not ${MODEL_METRICS.backtest_consensus_win_rate_pct}%?`,
             body: [
-              "The back-test produced 63% win rate on 27 trades during a 23-day hold-out. But 27 trades is a SMALL statistical sample — the same way flipping a coin 27 times and getting 17 heads doesn't prove the coin is biased.",
-              "We publish the realistic live target of ~55% (still well above the 52-55% hedge-fund median) because in real trading you will face: transaction costs dragging returns, market regime shifts we didn't test on, and the natural reversion of any short-window back-test. Our 63% number was a data point, not a steady state.",
+              `The ep2-heavy ensemble back-test (weights [0.5, 0.3, 0.2] for ep2, ep4, ep5) produced ${MODEL_METRICS.backtest_consensus_win_rate_pct}% win rate on ${MODEL_METRICS.backtest_consensus_n_trades} trades during a ${MODEL_METRICS.test_trading_days}-day hold-out. But ${MODEL_METRICS.backtest_consensus_n_trades} trades is a SMALL statistical sample — the same way flipping a coin ${MODEL_METRICS.backtest_consensus_n_trades} times and getting 18 heads doesn't prove the coin is biased.`,
+              `We publish the realistic live target of ~${MODEL_METRICS.live_consensus_win_rate_pct}% (still well above the 52-55% hedge-fund median) because in real trading you will face: transaction costs dragging returns, market regime shifts we didn't test on, and the natural reversion of any short-window back-test. Our ${MODEL_METRICS.backtest_consensus_win_rate_pct}% number was a data point, not a steady state.`,
               "When live production accumulates 500+ real trades, we'll have a statistically solid number we can stand behind — and we'll update this target based on actual performance, not assumptions.",
             ],
           },
           {
-            title: "Why Sharpe ~1.3 and not 8.15?",
+            title: `Why Sharpe ~${MODEL_METRICS.live_consensus_sharpe.toFixed(1)} and not ${MODEL_METRICS.backtest_consensus_sharpe}?`,
             body: [
               "Sharpe ratio = how much you earned per unit of risk. Formula: average return ÷ volatility of returns. Benchmarks: 0.5 = S&P 500 buy-and-hold, 1.0 = hedge-fund median, 2.0 = excellent, 3.0+ = elite (Medallion ~2-3). Anything above 3 sustained long-term is essentially impossible without massive private-data advantage.",
-              "Our back-test on 27 Consensus BUY trades produced Sharpe 8.15. That number is REAL (it's what those 27 trades actually delivered) but it cannot repeat in live trading. It's inflated by small sample, lucky window, epoch cherry-picking, and lack of transaction-cost modelling.",
-              "Realistic live target: Sharpe ~1.3. That puts us solidly in the hedge-fund-median-to-good range — a fair, defensible promise. If we deliver 1.3 in a year of live trading on this filter, that's a strong quant result.",
-              "Important: we publish the realistic number as our PRIMARY target, not the inflated back-test one. The 8.15 is in the caveats for full audit transparency, but 1.3 is what we'll be measured against.",
+              `Our ep2-heavy ensemble back-test on ${MODEL_METRICS.backtest_consensus_n_trades} Consensus BUY trades produced Sharpe ${MODEL_METRICS.backtest_consensus_sharpe}. That number is REAL (it's what those trades actually delivered) but it cannot repeat in live trading. It's inflated by small sample, lucky window, epoch cherry-picking, and lack of transaction-cost modelling.`,
+              `Realistic live target: Sharpe ~${MODEL_METRICS.live_consensus_sharpe.toFixed(1)}. That puts us solidly in the hedge-fund-median-to-good range — a fair, defensible promise. If we deliver ${MODEL_METRICS.live_consensus_sharpe.toFixed(1)} in a year of live trading on this filter, that's a strong quant result.`,
+              `Important: we publish the realistic number as our PRIMARY target, not the inflated back-test one. The ${MODEL_METRICS.backtest_consensus_sharpe} is in the caveats for full audit transparency, but ${MODEL_METRICS.live_consensus_sharpe.toFixed(1)} is what we'll be measured against.`,
             ],
           },
           {

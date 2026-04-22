@@ -21,8 +21,12 @@ anyone auditing our claims.
   FinBERT sentiment PCA, calendar).
 - **Output:** 7 quantiles × 22 trading days = full distributional forecast
   for the next ~1 month.
-- **Production ensemble:** 3 checkpoints (ep2 + ep4 + ep5) equal-weight
-  price-averaged. `ep5` is also used standalone for Top Picks.
+- **Production ensembles:** 3 checkpoints (ep2 + ep4 + ep5) used in two
+  different weight configurations depending on the use case:
+  - **ep5-heavy** `[0.2, 0.3, 0.5]` — Top Picks + per-ticker ranking
+    (maximises Top-20 Sharpe: 1.49 back-test vs 1.45 equal-weight)
+  - **ep2-heavy** `[0.5, 0.3, 0.2]` — Alpha Signals consensus filter
+    (maximises Consensus WR: 64.3% back-test vs 63% equal-weight)
 - **Universe in service:** 346 S&P 500 tickers (intersection of 400 trained
   ∩ current S&P 500).
 
@@ -30,15 +34,15 @@ anyone auditing our claims.
 
 | Metric                        | Back-test (raw) | Live target (what we publish) |
 |-------------------------------|-----------------|-------------------------------|
-| Top-20 Sharpe                 | 1.45            | **~1.0**                      |
-| Top-20 Return (23 days)       | +19.19%         | — (not annualised, back-test only) |
-| Consensus BUY Sharpe          | 8.15            | **~1.3**                      |
-| Consensus BUY win rate        | 63% (N=27)      | **~55%**                      |
-| 1-day MAPE                    | 4.78%           | ~5–6%                         |
-| 22-day MAPE                   | 12.49%          | ~14–16%                       |
-| 1-day directional accuracy    | 48.8%           | **Not marketed** — coin flip  |
-| 22-day directional accuracy   | 68%             | **~60%**                      |
-| Alpha vs S&P 500 (23 days)    | +11.46 pp       | **~+4 pp**                    |
+| Top-20 Sharpe (ep5-heavy)     | 1.49            | **~1.0**                      |
+| Top-20 Return (23 days)       | +19.74%         | — (back-test only)            |
+| Consensus BUY Sharpe (ep2-heavy) | 8.04         | **~1.3**                      |
+| Consensus BUY win rate (ep2-heavy) | 64.3% (N=28) | **~56%**                  |
+| 1-day MAPE                    | 4.75%           | ~5–6%                         |
+| 22-day MAPE                   | 12.63%          | ~14–16%                       |
+| 1-day directional accuracy    | 48.1%           | **Not marketed** — coin flip  |
+| 22-day directional accuracy   | 52.2%           | **Not marketed** — barely above random |
+| Alpha vs S&P 500 (23 days)    | +12.01 pp       | **~+4 pp**                    |
 
 Why the live targets are lower — see §8 "Shrinkage methodology".
 
@@ -206,30 +210,68 @@ Full per-epoch test performance (measured on N=9,200 sliding windows,
 
 Three "best-of" selections:
 
-- **ep5** → best Top-20 ranking (Sharpe 1.36, return +17.77%)
-- **ep2** → best Confident Long (Sharpe 5.70, WR 61.1%)
+- **ep5** → best Top-20 ranking single-model (Sharpe 1.36, return +17.77%)
+- **ep2** → best Confident Long single-model (Sharpe 5.70, WR 61.1%)
 - **ep4** → best short-horizon accuracy (MAPE 1d 4.74%)
 
-Ensemble = **equal-weight price-average of ep2 + ep4 + ep5 quantiles**:
+### Weight search — three variants tested
+
+The notebook tested 3 weight configurations on the same data:
+
+| Weights           | Top-20 % | Top-20 Sharpe | ConfLong Sh | N  | ConfLong WR | MAPE 1d | DirAcc 22d |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| Equal `[1/3,1/3,1/3]` | +19.19% | 1.45     | **8.15** 🥇 | 27 | 63.0%       | 4.78    | 0.527      |
+| **ep5-heavy `[0.2,0.3,0.5]`** 🏆 | **+19.74%** 🥇 | **1.49** 🥇 | 2.01        | 35 | 54.3%       | 4.75    | 0.522      |
+| **ep2-heavy `[0.5,0.3,0.2]`**    | +17.10% | 1.31          | 8.04        | 28 | **64.3%** 🥇 | 4.86    | 0.531      |
+
+**There is no universal best ensemble** — each weight configuration
+optimises a different metric.
+
+### Production: two ensembles, one per surface
+
+Different product surfaces care about different metrics:
+
+- **Top Picks** (ranking product) → users care about Top-20 Sharpe.
+  The more accurate the rank ordering, the better the basket of
+  diversified picks performs.
+- **Alpha Signals** (conviction filter) → users care about Win Rate.
+  Each signal is a concentrated bet; they need most to work, not an
+  average.
+- **Per-ticker rank** (same value prop as Top Picks) → same optimiser.
 
 ```python
-stacked = np.stack([ep2_q, ep4_q, ep5_q])         # (3, 22, 7)
-q_ensemble = np.mean(stacked, axis=0)              # (22, 7)
-signal = "BUY" if q_ensemble[0, Q_MEDIAN] > current_close else "SELL"
+# services/ensemble.py — weights parameter drives behaviour
+
+# Top Picks batch + per-ticker rank → ep5-heavy
+q_ens = 0.2*q_ep2 + 0.3*q_ep4 + 0.5*q_ep5   # Sharpe 1.49 back-test
+
+# Alpha Signals batch + Pro signal endpoint → ep2-heavy
+q_ens = 0.5*q_ep2 + 0.3*q_ep4 + 0.2*q_ep5   # WR 64.3% back-test
 ```
 
-### Ensemble metrics (what we actually ship)
+Cost: 3× inference time and 3× memory vs single-model. Since ensemble
+batch runs in Airflow (no user latency), this is acceptable. The live
+"Refresh Forecast" path on the ticker page still uses ep5 single
+(~10s) for UX reasons — next Airflow cron overwrites with the
+ensemble result within the hour.
 
-| Metric | Ensemble | vs best individual |
+### Ensemble metrics shipped (vs best individual)
+
+**Top Picks path (ep5-heavy):**
+
+| Metric | Ensemble | vs ep5 alone |
 |---|---|---|
-| Top-20 Sharpe | 1.45 | +0.09 (+6.6%) |
-| Top-20 Return | +19.19% | +1.42 pp |
-| ConfLong Sharpe | 8.15 | +2.45 |
-| ConfLong Win Rate | 63% | +3.1 pp |
-| ConfLong N trades | 27 | vs 36, 57, 57 |
-| MAPE 1d | 4.78% | +0.04 pp (marginally worse than ep4) |
-| MAPE 22d | 12.49% | ~1 pp better than worst individual |
-| DirAcc 22d (price-avg) | 68% | ~0% vs best single (also ~67%) |
+| Top-20 Sharpe | 1.49 | +0.13 (+9.6%) |
+| Top-20 Return | +19.74% | +1.97 pp |
+| MAPE 1d | 4.75% | +0.11 pp (marginally better) |
+
+**Alpha Signals path (ep2-heavy):**
+
+| Metric | Ensemble | vs ep2 alone |
+|---|---|---|
+| ConfLong Sharpe | 8.04 | +2.34 |
+| ConfLong Win Rate | 64.3% | +3.2 pp |
+| ConfLong N trades | 28 | vs 36 (slightly more selective) |
 
 ### Ensemble caveats (the honest bit)
 
@@ -323,9 +365,12 @@ default to 0 — model learned to handle that gracefully during training.
 
 ## 8. Live Targets — Shrinkage Methodology
 
-**Core claim:** back-test numbers (Sharpe 1.45, 8.15, 63% WR, 68% DirAcc,
-+11.46 pp alpha) will NOT repeat verbatim in live trading. Publishing
-them as-is would be misleading.
+**Core claim:** back-test numbers (Sharpe 1.49 ep5-heavy, Sharpe 8.04
+ep2-heavy, 64.3% Consensus WR, 52.2% DirAcc 22d, +12.01 pp alpha)
+will NOT repeat verbatim in live trading. Publishing them as-is would
+be misleading. Note: 22-day DirAcc is already essentially coin-flip in
+back-test, so we don't publish it at all — no live target, no caveat
+tooltip, no mention as a strength.
 
 ### Factors that will degrade back-test performance
 
@@ -341,12 +386,12 @@ them as-is would be misleading.
 Multiplied together, the cumulative shrinkage factor is roughly
 **0.25–0.45×** for the Consensus strategy and **0.55–0.75×** for Top-20.
 
-Applied:
-- Top-20 Sharpe 1.45 × 0.7 ≈ **1.0** (our live target)
-- Consensus Sharpe 8.15 × 0.15 ≈ **1.2** → rounded up to **~1.3**
-- Consensus WR 63% × 0.87 ≈ **55%**
-- DirAcc 22d 68% × 0.88 ≈ **60%**
-- Alpha 11.46 pp × 0.35 ≈ **+4 pp**
+Applied to current ep5-heavy / ep2-heavy back-test numbers:
+- Top-20 Sharpe 1.49 (ep5-heavy) × 0.67 ≈ **1.0** (our live target)
+- Consensus Sharpe 8.04 (ep2-heavy) × 0.16 ≈ **1.3** (live target)
+- Consensus WR 64.3% (ep2-heavy) × 0.87 ≈ **56%** (live target)
+- Alpha 12.01 pp × 0.33 ≈ **+4 pp**
+- DirAcc 22d 52.2% (ep5-heavy) — not shrunk, not marketed
 
 ### Honest framing in the product
 
@@ -357,10 +402,10 @@ Applied:
 - **BacktestSummary** card on Top Picks explicitly labels back-test
   numbers as "(audit only)" in smaller muted type.
 - **PageGuide** on Alpha Signals has dedicated sections *"Why ~55% and
-  not 63%?"* and *"Why ~1.3 Sharpe and not 8.15?"* with coin-flip
+  not 64.3%?"* and *"Why ~1.3 Sharpe and not 8.04?"* with coin-flip
   analogies and Medallion Fund benchmarks.
 
-This is "radical honesty" mode. Rationale: 8.15 Sharpe would be
+This is "radical honesty" mode. Rationale: 8.04 Sharpe would be
 higher than any fund in public records. Publishing it as the primary
 number would either (a) mislead novice users or (b) get dismissed by
 sophisticated evaluators. Publishing a defensible 1.3 gets us a fair
