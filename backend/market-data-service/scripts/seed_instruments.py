@@ -13,7 +13,6 @@ Usage:
 import asyncio
 import json
 import sys
-from datetime import date
 from pathlib import Path
 
 # Allow imports from backend/shared
@@ -25,7 +24,7 @@ for _p in [_script_dir.parent.parent, _script_dir.parent]:
 
 import structlog
 import yfinance as yf
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import async_session_factory

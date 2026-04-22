@@ -11,9 +11,8 @@ Usage:
 """
 
 import asyncio
-import math
 import sys
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 # Add parent dirs to path: works both locally (backend/) and in Docker (/app/)

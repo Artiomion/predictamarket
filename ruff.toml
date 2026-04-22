@@ -1,0 +1,8 @@
+# Backend uses `sys.path.insert(...)` before importing `shared/*` in many
+# services — imports after that manipulation are intentional, so E402 is
+# noise here. Everything else in E/F/W stays on.
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E402", "E501"]

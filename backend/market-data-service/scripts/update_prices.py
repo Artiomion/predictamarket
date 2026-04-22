@@ -98,7 +98,6 @@ async def update_prices_for_ticker(
         await logger.awarning("update_prices_sanity_check_failed", ticker=ticker, error=str(exc))
 
     rows_upserted = 0
-    prev_close = None
 
     for idx, row in hist.iterrows():
         trade_date = idx.date() if hasattr(idx, "date") else idx
@@ -122,7 +121,6 @@ async def update_prices_for_ticker(
         )
         await session.execute(stmt)
         rows_upserted += 1
-        prev_close = close_val
 
     # Cache latest price in Redis
     if not hist.empty:

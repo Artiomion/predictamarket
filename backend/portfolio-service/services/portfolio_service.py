@@ -105,7 +105,7 @@ async def add_position(
     tier: str,
     notes: str | None = None,
 ) -> PortfolioItem:
-    portfolio = await _get_portfolio_owned(session, portfolio_id, user_id)
+    await _get_portfolio_owned(session, portfolio_id, user_id)
     ticker_upper = ticker.upper()
 
     inst = await session.execute(

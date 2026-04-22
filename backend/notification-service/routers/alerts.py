@@ -53,4 +53,4 @@ async def alert_history_endpoint(
     session: AsyncSession = Depends(get_read_session),
 ) -> list[NotificationLogResponse]:
     logs = await get_notification_history(session, user_id, limit=limit)
-    return [NotificationLogResponse.model_validate(l) for l in logs]
+    return [NotificationLogResponse.model_validate(log) for log in logs]

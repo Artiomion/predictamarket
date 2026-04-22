@@ -1,7 +1,5 @@
 """Google OAuth — verify id_token from frontend, create/link user, issue JWT."""
 
-import secrets
-import uuid
 from datetime import datetime, timedelta, timezone
 
 import httpx

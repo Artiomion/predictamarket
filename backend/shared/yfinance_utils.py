@@ -1,11 +1,13 @@
 """Shared yfinance wrapper with timeout, retry, and Redis caching for macro data."""
 
-import json
 import time
-from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import structlog
 import yfinance as yf
+
+if TYPE_CHECKING:
+    import pandas as pd  # noqa: F401  (used only in string type hints)
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = structlog.get_logger()

@@ -4,7 +4,6 @@ from datetime import date, timedelta
 from uuid import UUID
 
 import structlog
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

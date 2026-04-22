@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from shared.models.market import CompanyProfile, FinancialMetric, Instrument, PriceHistory
+from shared.models.market import FinancialMetric, Instrument, PriceHistory
 from shared.redis_client import redis_client
 
 from schemas.market import (

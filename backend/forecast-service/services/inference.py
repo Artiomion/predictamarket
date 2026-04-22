@@ -20,8 +20,6 @@ import pandas as pd
 import psycopg2
 import structlog
 import torch
-import feedparser
-import requests
 
 from shared.config import settings
 from shared.utils import (

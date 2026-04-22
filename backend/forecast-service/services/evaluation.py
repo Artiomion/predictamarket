@@ -3,7 +3,7 @@
 from datetime import date, datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 

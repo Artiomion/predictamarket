@@ -1,7 +1,6 @@
 """EDGAR DB operations — query stored financial statements."""
 
 import structlog
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
