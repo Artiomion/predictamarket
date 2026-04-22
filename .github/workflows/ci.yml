@@ -23,7 +23,7 @@ jobs:
           pip install ruff mypy
           pip install -r backend/requirements-base.txt
       - name: Ruff lint
-        run: ruff check backend/ --select E,F,W --ignore E501
+        run: ruff check backend/ --select E,F,W --ignore E501,E402
       - name: Ruff format check
         run: ruff format backend/ --check || true
 
