@@ -31,7 +31,7 @@ from services.forecast_service import (
     get_top_picks,
     store_forecast,
 )
-from services.forecast_service import VALID_TICKERS
+from services.forecast_service import BLOCKLISTED_TICKERS, VALID_TICKERS
 from shared.models.forecast import Forecast
 from services.ensemble import run_ensemble
 from services.inference import run_inference
@@ -184,6 +184,16 @@ async def create_forecast(
     """Run live TFT inference for a ticker. Rate limited by tier."""
     ticker_upper = ticker.upper()
 
+    if ticker_upper in BLOCKLISTED_TICKERS:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Forecast unavailable for {ticker_upper}. This stock has known data-quality "
+                "issues (post-split / corporate-action mismatch between training data and live "
+                "prices) that make predictions unreliable. Scheduled to be re-enabled after the "
+                "next model retrain on split-adjusted data."
+            ),
+        )
     if VALID_TICKERS and ticker_upper not in VALID_TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not in supported S&P 500 set")
 
@@ -221,6 +231,11 @@ async def create_signal_forecast(
         raise HTTPException(status_code=403, detail="Alpha Signals require Pro or Premium subscription")
 
     ticker_upper = ticker.upper()
+    if ticker_upper in BLOCKLISTED_TICKERS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Alpha signal unavailable for {ticker_upper} — data-quality blocklist.",
+        )
     if VALID_TICKERS and ticker_upper not in VALID_TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not supported")
 
@@ -267,6 +282,11 @@ async def get_ticker_rank(
     ticker_upper = ticker.upper()
 
     # Distinguish 404s: ticker not in catalog vs no forecasts yet.
+    if ticker_upper in BLOCKLISTED_TICKERS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Rank unavailable for {ticker_upper} — data-quality blocklist (no forecasts generated).",
+        )
     if VALID_TICKERS and ticker_upper not in VALID_TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker_upper} not in supported S&P 500 set")
 

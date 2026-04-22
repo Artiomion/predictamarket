@@ -14,15 +14,29 @@ from shared.utils import HORIZON_LABELS
 
 logger = structlog.get_logger()
 
-# Load valid tickers from file at module level (works without model loaded)
+# Load valid tickers from file at module level (works without model loaded).
+# Also load the blocklist of tickers where predictions are unreliable due to
+# post-split / corporate-action data mismatch — these are subtracted from
+# VALID_TICKERS so /forecast/{ticker} returns 404 for them.
 _TICKERS_FILE = Path(__file__).resolve().parent.parent.parent.parent / "models" / "old_model_sp500_tickers.txt"
+_BLOCKLIST_FILE = Path(__file__).resolve().parent.parent.parent.parent / "models" / "blocklist_tickers.txt"
 _MODELS_DIR_ENV = None  # Set from env if needed
 
 VALID_TICKERS: set[str] = set()
+BLOCKLISTED_TICKERS: set[str] = set()
 try:
     import os
-    _tf = Path(os.environ.get("MODELS_DIR", str(_TICKERS_FILE.parent))) / "old_model_sp500_tickers.txt"
-    VALID_TICKERS = {t.strip().upper() for t in _tf.read_text().strip().splitlines() if t.strip()}
+    _models_dir = Path(os.environ.get("MODELS_DIR", str(_TICKERS_FILE.parent)))
+    _tf = _models_dir / "old_model_sp500_tickers.txt"
+    _all = {t.strip().upper() for t in _tf.read_text().strip().splitlines() if t.strip()}
+    _bl_path = _models_dir / "blocklist_tickers.txt"
+    if _bl_path.exists():
+        BLOCKLISTED_TICKERS = {
+            t.strip().upper()
+            for t in _bl_path.read_text().strip().splitlines()
+            if t.strip() and not t.strip().startswith("#")
+        }
+    VALID_TICKERS = _all - BLOCKLISTED_TICKERS
 except Exception as exc:
     logger.warning("valid_tickers_load_failed", error=str(exc), path=str(_TICKERS_FILE))
 

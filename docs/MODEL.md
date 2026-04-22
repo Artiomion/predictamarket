@@ -450,9 +450,31 @@ hearing in both audiences.
    memory budget; `lr=3e-4` and `dropout=0.1` are reasonable defaults,
    not Optuna-tuned.
 
----
+8. **36-ticker blocklist (split-adjustment mismatch).** Training used
+   raw HuggingFace prices; live prices come from yfinance, which is
+   split-adjusted. Post-2024 splits (NVDA 10:1, AVGO 10:1, WMT 3:1, and
+   ~30 others) cause the encoder window to span both pre- and
+   post-split prices, producing nonsensical forecasts (MAPE ≫ 10%,
+   wildly wrong rank positions). These tickers are listed in
+   `models/blocklist_tickers.txt` (36 entries; 28 overlap with the
+   346-ticker S&P 500 universe, giving 318 active). Both
+   `forecast-service` and `market-data-service` load the file at
+   startup:
+   - `/api/market/instruments/{ticker}` → 404 for blocked tickers
+   - `/api/market/instruments` catalog excludes them (total drops
+     346 → 318)
+   - `POST /forecast/{ticker}` → 409 Conflict with explanation
+   - `GET /forecast/{ticker}/rank`, `POST /forecast/{ticker}/signals`
+     → 409 Conflict
+   - Airflow `dag_run_forecast` + `dag_alpha_signals` iterate over
+     `artifacts.valid_tickers` which has the blocklist subtracted, so
+     no rows get generated for blocked tickers.
 
-## 10. Model Artifacts
+   DB rows (forecasts, alpha_signals) were wiped for these tickers; user
+   data (watchlists, portfolios, price_history) is preserved — a
+   watchlist/portfolio entry referencing e.g. NVDA will 404 on render
+   until the ticker comes back. Will be resolved in the next retrain on
+   split-adjusted prices (roadmap item).
 
 All in `models/`:
 

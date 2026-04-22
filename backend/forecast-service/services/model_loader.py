@@ -111,6 +111,7 @@ class ModelArtifacts:
         self.finbert_tokenizer = None
         self.finbert_model = None
         self.valid_tickers: set[str] = set()
+        self.blocklisted_tickers: set[str] = set()
         self.known_tickers: list[str] = []
         self.device = "cpu"
         self.checkpoint_name: str = ""
@@ -141,13 +142,35 @@ class ModelArtifacts:
                 self.dataset_params["categorical_encoders"]["__group_id__ticker"].classes_.keys()
             )
 
-            # 3. Valid tickers (346 S&P 500 ∩ trained)
+            # 3. Valid tickers (346 S&P 500 ∩ trained) minus the blocklist.
+            # Blocklist = tickers where model predictions are unreliable due to
+            # post-split / corporate-action data mismatch between training data
+            # (raw HuggingFace prices pre-split) and live data (yfinance
+            # post-split). These produce MAPE >> 10% and catastrophically wrong
+            # rank positions — better to return 404 than mislead the user. Will
+            # be re-enabled after a retrain on split-adjusted prices.
             ticker_file = models_dir / "old_model_sp500_tickers.txt"
-            self.valid_tickers = {
+            all_tickers = {
                 t.strip().upper()
                 for t in ticker_file.read_text().strip().splitlines()
                 if t.strip()
             }
+            blocklist_file = models_dir / "blocklist_tickers.txt"
+            blocklist: set[str] = set()
+            if blocklist_file.exists():
+                blocklist = {
+                    t.strip().upper()
+                    for t in blocklist_file.read_text().strip().splitlines()
+                    if t.strip() and not t.strip().startswith("#")
+                }
+            self.valid_tickers = all_tickers - blocklist
+            self.blocklisted_tickers = blocklist
+            if blocklist:
+                structlog.get_logger().info(
+                    "blocklist_applied",
+                    n_blocklisted=len(blocklist),
+                    n_valid=len(self.valid_tickers),
+                )
 
             # 4. Primary TFT checkpoint (ep5)
             self.checkpoint_name = PRIMARY_CKPT

@@ -1,5 +1,7 @@
 import json
+import os
 from datetime import date, timedelta
+from pathlib import Path
 
 import structlog
 from fastapi import HTTPException
@@ -22,6 +24,28 @@ CACHE_LIST_TTL = 60       # 1 min
 CACHE_DETAIL_TTL = 300    # 5 min
 CACHE_PRICE_TTL = 60      # 1 min
 
+# Load ticker blocklist from models/blocklist_tickers.txt. These are tickers
+# where post-split / corporate-action data mismatch makes forecasts
+# unreliable — we hide them from the catalog and return 404 on direct
+# /instruments/{ticker} lookups so they're effectively removed from the
+# service. Watchlist / portfolio rows that reference them are left in DB
+# but will fail to render (404) — user's data isn't deleted, just the
+# ticker is uncovered. Will be re-enabled after a retrain on
+# split-adjusted prices.
+_MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/models"))
+BLOCKLISTED_TICKERS: set[str] = set()
+try:
+    _bl_file = _MODELS_DIR / "blocklist_tickers.txt"
+    if _bl_file.exists():
+        BLOCKLISTED_TICKERS = {
+            t.strip().upper()
+            for t in _bl_file.read_text().strip().splitlines()
+            if t.strip() and not t.strip().startswith("#")
+        }
+        logger.info("blocklist_loaded", n=len(BLOCKLISTED_TICKERS))
+except Exception as exc:
+    logger.warning("blocklist_load_failed", error=str(exc))
+
 
 def _escape_like(value: str) -> str:
     """FIX #1: Escape LIKE wildcards to prevent filter bypass."""
@@ -30,6 +54,8 @@ def _escape_like(value: str) -> str:
 
 async def _check_instrument_exists(session: AsyncSession, ticker: str) -> None:
     """FIX #2/#3: Lightweight existence check without eager-loading profile."""
+    if ticker.upper() in BLOCKLISTED_TICKERS:
+        raise HTTPException(status_code=404, detail=f"Instrument {ticker} not currently served.")
     result = await session.execute(
         select(Instrument.id).where(
             Instrument.ticker == ticker,
@@ -60,6 +86,10 @@ async def get_instruments(
         Instrument.is_active.is_(True),
         Instrument.deleted_at.is_(None),
     )
+
+    # Hide blocklisted tickers from the catalog entirely.
+    if BLOCKLISTED_TICKERS:
+        query = query.where(Instrument.ticker.not_in(BLOCKLISTED_TICKERS))
 
     if sector:
         query = query.where(Instrument.sector == sector)
@@ -102,6 +132,12 @@ async def get_instrument_by_ticker(
     ticker: str,
 ) -> Instrument:
     ticker_upper = ticker.upper()
+
+    if ticker_upper in BLOCKLISTED_TICKERS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Instrument {ticker_upper} is not currently served — see docs/MODEL.md blocklist.",
+        )
 
     result = await session.execute(
         select(Instrument)

@@ -133,6 +133,9 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/predictamarket
       - REDIS_URL=redis://redis:6379/0
       - DEBUG=false
+      - MODELS_DIR=/models
+    volumes:
+      - ./models:/models:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8002/health || exit 1"]
       interval: 10s
