@@ -36,6 +36,26 @@ logger = structlog.get_logger()
 BATCH_SIZE = 10
 PRICE_CACHE_TTL = 300  # 5 min
 
+# Sanity-check threshold: reject any yfinance close that differs from the
+# last known DB close by more than this fraction. Previously saw GS get
+# corrupted with volume=0 rows at ~$19 when the real price was ~$926
+# (delta ~−98%) — yfinance sometimes returns stale / pre-split unadjusted
+# data under rate-limit conditions. A >50% move in a liquid S&P 500 name
+# in a single day is virtually impossible; treating it as corruption and
+# skipping the upsert is the safer default.
+BACKFILL_MAX_DELTA = 0.5
+
+
+async def _get_latest_db_close(session: AsyncSession, ticker: str) -> float | None:
+    """Latest stored close for `ticker`, or None if no history."""
+    q = await session.execute(
+        text("SELECT close FROM market.price_history WHERE ticker = :t "
+             "ORDER BY date DESC LIMIT 1"),
+        {"t": ticker},
+    )
+    row = q.first()
+    return float(row[0]) if row and row[0] is not None else None
+
 
 async def update_prices_for_ticker(
     session: AsyncSession,
@@ -54,6 +74,28 @@ async def update_prices_for_ticker(
 
     if hist.empty:
         return 0
+
+    # Sanity check: if the newest yfinance close is wildly off from what we
+    # already have for this ticker, treat the whole response as suspect and
+    # bail. This matches the same guard in forecast-service's
+    # _backfill_fresh_prices and protects against silent corruption.
+    try:
+        newest_close = float(hist.iloc[-1]["Close"])
+        db_close = await _get_latest_db_close(session, ticker)
+        if db_close and db_close > 0 and newest_close > 0:
+            delta = abs(newest_close / db_close - 1)
+            if delta > BACKFILL_MAX_DELTA:
+                await logger.aerror(
+                    "update_prices_rejected_extreme_delta",
+                    ticker=ticker,
+                    yf_close=newest_close,
+                    db_close=db_close,
+                    delta_pct=round(delta * 100, 1),
+                )
+                return 0
+    except Exception as exc:
+        # Sanity check shouldn't hard-fail the pipeline — log and continue.
+        await logger.awarning("update_prices_sanity_check_failed", ticker=ticker, error=str(exc))
 
     rows_upserted = 0
     prev_close = None

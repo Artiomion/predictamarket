@@ -119,11 +119,22 @@ async def _publish_status(phase: str, **payload) -> None:
         await logger.awarning("alpha_status_publish_failed", phase=phase, error=str(exc))
 
 
-async def main() -> None:
+async def main(only_tickers: list[str] | None = None) -> None:
+    """Run Alpha Signals ensemble inference.
+
+    :param only_tickers: if given, process only these tickers (useful for
+        targeted re-runs of a specific ticker that was missed by the
+        previous batch — e.g. after cleanup of corrupted price data).
+        Defaults to the full 346-ticker universe.
+    """
     await asyncio.to_thread(artifacts.ensure_loaded)
     await asyncio.to_thread(artifacts.ensure_ensemble_loaded)
 
-    tickers = sorted(artifacts.valid_tickers)
+    if only_tickers:
+        only_set = {t.upper() for t in only_tickers}
+        tickers = sorted(only_set & artifacts.valid_tickers)
+    else:
+        tickers = sorted(artifacts.valid_tickers)
     sectors_map = {
         t.upper(): s for t, s in (artifacts.config.get("sectors") or {}).items()
     }
@@ -216,4 +227,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Optional CLI arg: comma-separated tickers to limit the run
+    # (e.g. `python run_alpha_signals.py GS` to process only GS).
+    import sys
+    only = sys.argv[1].split(",") if len(sys.argv) > 1 else None
+    asyncio.run(main(only_tickers=only))
