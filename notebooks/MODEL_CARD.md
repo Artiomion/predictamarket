@@ -4,6 +4,8 @@
 **Дата:** апрель 2026
 **Автор:** Artem Sotnikov
 
+Drive
+https://drive.google.com/drive/folders/1S6n0jjyjP7-iIGgFDm_UKGJkub1ygwJ2?usp=share_link
 ---
 
 ## Executive Summary
