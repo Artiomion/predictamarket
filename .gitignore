@@ -33,3 +33,15 @@ lightning_logs/
 # See docs/ENSEMBLE_NOTES.md for artifact sources.
 models/*.ckpt
 models/old_backup_*/
+
+# Internal working docs — not for public repo
+CLAUDE.md
+PROMPTS.md
+
+# Model artifacts — IP-sensitive; fetch separately when provisioning.
+# .ckpt already excluded above. Pickles + training config + reference
+# notebooks stay out of the repo. Tiny runtime-required text files
+# (ticker lists, blocklist) are kept so fresh clones can boot services.
+models/*.pkl
+models/config.json
+models/*.ipynb

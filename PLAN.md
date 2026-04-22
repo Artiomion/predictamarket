@@ -9,7 +9,8 @@
 | **Тип проекта** | Pet-project |
 | **Назначение** | Веб-платформа для инвесторов — аналог CoinMarketCap для акций с AI-прогнозами |
 | **Уникальная фича** | Мультимодальный ML-прогноз + ранжирование акций + доверительные интервалы |
-| **Рынок** | S&P 500 (США) — 346 тикеров (пересечение 400 обученных ∩ S&P 500) |
+| **Рынок** | S&P 500 (США) — **318 активных тикеров** (346 в модели ∩ S&P 500, минус 28 из 36-ticker blocklist где post-split / corporate-action data mismatch) |
+| **Статус** | Фазы 1-3 завершены (ML + Backend + Frontend). Фаза 4 (polish + launch) в работе. |
 
 ---
 
@@ -35,11 +36,12 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 
 ### Ключевые возможности (обзор)
 
-- Каталог 94 акций из S&P 500 с котировками в реальном времени
-- AI-прогноз на горизонт 1д / 3д / 1нед / 2нед / 1мес / 3мес с доверительным интервалом 80% и 95%
-- **AI-ранжирование** — модель определяет какие акции вырастут больше других (Win Rate 63% на consensus BUY, Sharpe 1.45 на Top-20)
-- **Торговые сигналы**: BUY / SELL / HOLD с уровнем уверенности HIGH / LOW
-- "Top Picks" — топ-10/20 акций по predicted return
+- Каталог **318 акций** S&P 500 с котировками в реальном времени (WebSocket + yfinance poll каждые 30 сек для активных подписок)
+- AI-прогноз на горизонт 1д / 3д / 1нед / 2нед / 1мес с доверительным интервалом 80% и 95%
+- **AI-ранжирование (Top Picks)** — ep5-heavy ensemble [0.2/0.3/0.5]. Back-test Sharpe 1.49 на Top-20 (live target ~1.0 после shrinkage)
+- **Alpha Signals (Premium)** — ep2-heavy ensemble [0.5/0.3/0.2]. Back-test Win Rate 64.3% на consensus BUY (live target ~56%)
+- **Торговые сигналы**: BUY / SELL / HOLD с уровнем уверенности HIGH / MEDIUM / LOW
+- "Top Picks" — топ-10/20 акций по predicted return, фильтр по positive return + BUY signal
 - Профессиональные candlestick-графики с техническим анализом и прогноз overlay
 - Финансовые показатели компании и отчётность SEC EDGAR
 - Управление портфелем с продвинутой аналитикой
@@ -66,8 +68,11 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 > **Примечание по доверительным интервалам:**
 > - 80% CI = диапазон между квантилями 0.1 и 0.9 (уже в API)
 > - 95% CI ≈ диапазон между квантилями 0.02 и 0.98 (фактически ~96%, что достаточно близко к 95%). Модель уже считает эти квантили — нужно просто добавить их в JSON-ответ API как `lower_95` / `upper_95`. Переобучение не требуется.
-| Тикеры | 400 (текущий S&P 500) |
-| Данные | 2000-03-14 — 2026-04-02 (2.4M строк) |
+| Тикеры обучения | 400 (из 2,638 в HuggingFace датасете) |
+| Тикеры в сервисе | **318 активно** (346 S&P 500 ∩ модель − 28 blocklist). См. `docs/MODEL.md §9` про split-adjustment blocklist. |
+| Данные | 2000-03-14 — 2026-04-02 (~2.4M строк train, 9200 test windows post-Oct-2025) |
+| Primary checkpoint | `tft-epoch=05-val_loss=9.3008.ckpt` (ep5) |
+| Ensemble (per-surface) | ep5-heavy [0.2/0.3/0.5] для Top Picks · ep2-heavy [0.5/0.3/0.2] для Alpha Signals |
 
 ### Входные данные (107 фичей)
 
@@ -83,73 +88,96 @@ PredictaMarket — веб-сервис для инвесторов, позвол
 | Calendar | days_to_fomc, is_options_expiration, is_quad_witching | hardcoded dates |
 | Cross-asset | beta_spy_20d | computed |
 
-### Текущие метрики качества (ensemble ep2+ep4+ep5, post-Oct-2025 test window Nov 2025 — early Apr 2026, N=9200)
+### Текущие метрики (test window Nov 2025 — Apr 2026, N=9200, single window)
 
-| Метрика | Значение | Оценка |
+Две конфигурации ensemble оптимизируются отдельно под разные surface'ы. На UI показываются **live targets** (после heuristic shrinkage для single-window bias); raw back-test цифры доступны в caveat-тултипах.
+
+**Top Picks — ep5-heavy [0.2/0.3/0.5]:**
+
+| Метрика | Back-test | Live target (headline) |
 |---|---|---|
-| MAPE 1d | **4.78%** | Хорошо (< 10%) |
-| MAPE 22d | 12.49% | Приемлемо (rank/direction, не target price) |
-| DirAcc 1d | ~49% | Random (не маркетим) |
-| **DirAcc 22d** | **68.0%** | **34σ выше случайности** — реальный edge |
-| CI Coverage 80% (actual) | 68.9% | Under-calibrated |
-| **Top-20 Sharpe** | **1.45** | **Hedge-fund threshold** — core strength |
-| Top-20 Return | +19.19% | Vs S&P 500 +7.73% за 23 дня |
-| **ConfLong Sharpe** | **8.15** | Premium Alpha Signals (N=27 trades) |
-| ConfLong Win Rate | **63.0%** | ConfLong subset (все 3 модели согласны) |
+| Top-20 Sharpe | 1.49 | **~1.0** |
+| Top-20 Return (23 дня) | +19.74% | — |
+| Alpha vs S&P 500 | +12.01pp | **~+4pp** |
+| MAPE 1d | 4.75% | — |
+
+**Alpha Signals — ep2-heavy [0.5/0.3/0.2] (Premium):**
+
+| Метрика | Back-test | Live target |
+|---|---|---|
+| ConfLong Sharpe | 8.04 | **~1.3** (heavy shrinkage, N=28) |
+| ConfLong Win Rate | 64.3% | **~56%** |
+| N trades (back-test) | 28 | — |
+
+**Shared (обе конфигурации):**
+
+| Метрика | Значение | Комментарий |
+|---|---|---|
+| DirAcc 1d | 48.1% | Random — не маркетим |
+| DirAcc 22d | 52.2% | Barely above random — **не маркетим** как strength |
+| MAPE 22d | 12.63% | Слишком широко для price targets — используем для ranking/direction |
 | Inference time | ~1 сек single / ~3 сек ensemble | Приемлемо |
+| S&P 500 baseline | +7.73% / Sharpe 0.8 | Benchmark |
 
-### Главная сила модели — ранжирование и consensus filter
+### Главная сила модели — ранжирование и conviction filter
 
-**Ранжирование акций** — модель отлично определяет какие акции вырастут больше других. Top-20 daily rebalance достигает Sharpe 1.45 (hedge-fund порог ~1.0) и возвращает +19.2% vs S&P 500 +7.7% за test window.
+**Ранжирование акций (Top Picks)** — ep5-heavy ensemble [0.2/0.3/0.5]. Back-test: Top-20 Sharpe 1.49, return +19.74%, alpha +12.01pp vs S&P 500. Live target после shrinkage — Sharpe ~1.0, alpha ~+4pp. Это и есть core value platform'ы.
 
-**Consensus filter** — когда 3 независимых checkpoint (ep2+ep4+ep5) согласны что lower_80 > current_close, это даёт back-tested Sharpe 8.15 и 63% WR на 27 trades. Это премиум фича — Alpha Signals.
+**Conviction filter (Alpha Signals, Premium)** — ep2-heavy ensemble [0.5/0.3/0.2]. Когда `lower_80 > current_close` (все 3 модели согласны), WR 64.3% на 28 trades в back-test. Live target ~56% WR. Малая выборка — caveat в UI.
 
-**Long-horizon direction (месяц)** — 68% DirAcc на 22-дневный горизонт. 34σ выше случайности на N=9200. Единственный direction-related сигнал, который можно честно маркетить.
+**Directional accuracy — НЕ маркетим.** DirAcc 1d = 48.1% (random), DirAcc 22d = 52.2% (едва выше coin flip). Ранее было предположение про 68% — это была ошибочная интерпретация другой метрики. Radical honesty mode: в UI не упоминается.
 
 **Как это отражается в продукте:**
-- **Top Picks** — главный экран платформы. Модель выбирает 10-20 акций с максимальным predicted return. Back-test: Sharpe 1.45, Return +19.2% за 23 trading days (single test window).
-- **Confident Signals Dashboard** — отдельная секция с акциями, по которым модель уверена. BUY + HIGH confidence = зелёный badge с меткой «63% WR». Пользователь сразу видит, каким сигналам модель «доверяет» больше всего.
-- **Ранжирование на Dashboard** — основная сортировка каталога по predicted return, а не по алфавиту или рыночной капитализации. Самые перспективные акции наверху.
-- **Прогноз с доверительными интервалами** — 80% и 95% CI на графике. Модель не просто говорит «вырастет», а показывает диапазон и свою уверенность. Узкий интервал = модель уверена, широкий = высокая неопределённость.
-- **Waterfall Chart «Что повлияло»** — TFT имеет встроенный механизм attention и variable importance. Пользователь видит топ-5 факторов, повлиявших на прогноз конкретной акции.
+- **Top Picks** — главный экран. Модель выбирает 10-20 акций с максимальным predicted return + BUY signal + положительный 1m return.
+- **Alpha Signals (Premium)** — отдельный feed ensemble-сигналов с conviction filter. Pro/Premium-only.
+- **Ranking на Dashboard** — основная сортировка по predicted return, не по алфавиту/капе.
+- **Доверительные интервалы** — 80% (лента) и 95% (полупрозрачная) на графике прогноза.
+- **Waterfall Chart «Что повлияло»** — TFT variable importance → топ-5 факторов для каждого прогноза.
+- **Extreme-forecast warning** — при `|predicted_return_1m| > 30%` UI показывает warning chip что dollar target ненадёжен, использовать rank tier вместо absolute price.
 
 ### Что нужно улучшить
 
-- **Walk-forward валидация** — сейчас single test window. Нужно 3-5 непересекающихся окон для уверенности что метрики держатся (главный caveat для инвесторов/юзеров)
-- **Direction prediction на 1d** — сейчас random (~49%). Модель не заточена под короткий горизонт. Исправляется либо retrain с direction-loss, либо отдельная специализированная модель
-- **CI calibration** — actual 69% vs target 80%. Overconfident, можно уменьшить miscalibration через temperature scaling
-- **12 SEC фичей не покрыты** — некоторые XBRL concepts не у всех компаний, особенно AMZN/TSLA (55-60% feature coverage). Требует расширения EDGAR scraper
+- **Walk-forward валидация** — сейчас single test window (23 trading days). Нужно 3-5 rolling окон для уверенности что метрики держатся. Notebook 09_temporal_robustness начат, полноценный walk-forward (NB07) отложен на retrain.
+- **Split-adjustment blocklist** — 28 S&P 500 тикеров (NVDA, AVGO, WMT, GE, GS и др.) заблокированы из-за post-split price mismatch. Снимается retrain'ом на split-adjusted prices.
+- **Residual correlation между ensemble members** — corr(ep2,ep4)=0.978, corr(ep2,ep5)=0.989. Diversification bonus минимален. True ensemble требует независимых seeds.
+- **Sentiment features largely unused** — 32 из 107 фичей (sent_0..sent_31 PCA) не попали в топ variable importance. Модель учится по OHLCV/technical/SEC financials, не по news. Либо дропнуть sentiment, либо weight'ить сильнее при retrain.
+- **Model systematically bearish** — mean prediction 1d = −3.5% на обучающих данных при реальном +0.1%. В live inference ~71% сигналов SELL/AVOID. Baked в обучающее распределение (2020-2024 содержал много коррекций).
+- **Hyperparameter tuning не запускался** — hidden_size=256 выбран по A100 memory, не Optuna. LR/dropout — reasonable defaults.
+- **SEC coverage ~88-91%** на flagship тикерах (AAPL/NVDA/MSFT). ~12 XBRL концептов не у всех компаний.
 
-### Jupyter Notebooks (ML Pipeline)
+### Jupyter Notebooks (в `notebooks/`, не в git)
 
-| Ноутбук | Назначение | Статус |
-|---|---|---|
-| 01_data_exploration.ipynb | EDA датасета | Выполнен |
-| 02_preprocessing.ipynb | Предобработка (2638 тикеров) | Выполнен |
-| 02b_update_data.ipynb | Обновление данных до апреля 2026 | Выполнен |
-| 03_model_training.ipynb | Обучение TFT | Выполнен (3 эпохи, нужно дообучить) |
-| 03b_lightgbm_ensemble.ipynb | LightGBM + Ensemble | Выполнен (LGB не дал результатов, только TFT) |
-| 04_model_evaluation.ipynb | Оценка качества | Выполнен |
-| 05_inference_test.ipynb | Тест inference + dashboard | Выполнен |
-| 06_backtesting.ipynb | Backtesting торговых стратегий | Выполнен |
-| 07_walk_forward.ipynb | Walk-forward валидация | Исправлен, не запускался |
-| 08_live_inference_pipeline.ipynb | Live inference из API | Выполнен |
+| Ноутбук | Назначение |
+|---|---|
+| 01_data_exploration.ipynb | EDA HuggingFace датасета (2,638 тикеров) |
+| 02b_update_data.ipynb | Обновление данных до Apr 2026 |
+| 03_model_training.ipynb | TFT обучение (7 эпох сохранены, ep0..ep6) |
+| 04_model_evaluation.ipynb | MAPE, DirAcc, CI coverage, ensemble study |
+| 05_inference_test.ipynb | End-to-end inference validation |
+| 06_backtesting.ipynb | Top-20 + ConfLong стратегии, Sharpe, alpha |
+| 09_temporal_robustness.ipynb | Temporal stability (частичный walk-forward) |
+| MODEL_CARD.md | Сводная модель-карта для внешнего аудита |
 
-### Артефакты модели (на Google Drive)
+Live inference реализация — в `backend/forecast-service/services/inference.py`, не в ноутбуке.
+
+### Артефакты модели (out-of-repo)
+
+Все тяжёлые артефакты (`.ckpt`, `.pkl`, `config.json`, reference notebooks) исключены из git (IP + размер). Распространяются отдельно. Что хранится локально для работы сервисов:
 
 ```
-predictamarket/
-  data/
-    train.parquet          — 2.3M строк, 400 тикеров, → июнь 2025
-    val.parquet            — 35K строк, июль-октябрь 2025
-    test.parquet           — 42K строк, ноябрь 2025 — апрель 2026
-    config.json            — конфигурация модели и фичей
-    pca_model.pkl          — PCA модель для sentiment (768d → 32d)
-  models/
-    tft-epoch=02-*.ckpt    — чекпоинт TFT модели (~200MB)
-    training_dataset_params.pkl — параметры TimeSeriesDataSet
-    config.json            — копия конфигурации
+models/
+  tft-epoch=02-val_loss=8.8051.ckpt   — ensemble member (ep2, 188 MB)
+  tft-epoch=04-val_loss=9.2586.ckpt   — ensemble member (ep4, 188 MB)
+  tft-epoch=05-val_loss=9.3008.ckpt   — primary + ensemble (ep5, 188 MB)
+  config.json                          — 107 фичей, 27 SEC метрик, cutoffs
+  training_dataset_params.pkl          — TimeSeriesDataSet categorical_encoders/scalers/normalizer
+  pca_model.pkl                        — IncrementalPCA(32) для FinBERT embeddings
+  old_model_400_tickers.txt            — 400 тикеров обучения (в репо)
+  old_model_sp500_tickers.txt          — 346 S&P 500 ∩ модель (в репо)
+  blocklist_tickers.txt                — 36 blocklisted тикеров (в репо)
 ```
+
+Фикс SHA256 чекпоинтов в `backend/forecast-service/services/model_loader.py` — проверка целостности при загрузке.
 
 ### API модели (output)
 
@@ -254,12 +282,12 @@ predictamarket/
 **Концепция:** Главный экран после Dashboard. Показывает конкурентное преимущество модели.
 
 **Содержание:**
-- Топ-10 (Free) / Топ-20 (Pro/Premium) акций по predicted return
+- Топ-5 (Free) / Топ-20 (Pro/Premium) акций по predicted return
 - Для каждой акции: тикер, название, текущая цена, predicted return %, signal, confidence
-- Mini-chart с прогнозной линией
-- Badge: «63% Win Rate» (ensemble ConfLong) на confident signals
-- Backtesting performance: исторический return стратегии Top-20 vs S&P 500 (интерактивный график)
-- Обновляется каждый час (после dag_run_forecast)
+- Фильтр: BUY signal + positive 1m return (иначе Top Picks выглядит broken с отрицательными returns)
+- Badge «~56% Win Rate (live target)» на confident ensemble-сигналах
+- Backtesting performance: Top-20 vs S&P 500 в тестовом окне (23 trading days)
+- Обновляется каждый час (Airflow `dag_run_forecast`) через ep5-heavy ensemble
 
 ### 3.6. Управление портфелем
 
@@ -269,7 +297,7 @@ predictamarket/
 - Drag-and-drop позиций между портфелями
 
 **Добавление позиций:**
-- Тикер (autocomplete из 400 S&P 500)
+- Тикер (autocomplete из 318 активных S&P 500)
 - Количество акций
 - Цена покупки (или текущая рыночная)
 - Дата сделки
@@ -415,7 +443,7 @@ predictamarket/
 | Функция | Лимит |
 |---|---|
 | Всё из Free + | |
-| AI-прогноз | 10 прогнозов/день, все 346 тикеров |
+| AI-прогноз | 10 прогнозов/день, все 318 активных тикеров |
 | Top Picks | Топ-20 |
 | Портфель | 5 портфелей, безлимит позиций |
 | Watchlist | 5 вотчлистов, безлимит |
@@ -775,17 +803,18 @@ WebSocket (Socket.IO):
 ## 14. Текущий статус и план
 
 ### Фаза 1: ML Foundation ✅
-- [x] EDA датасета (2638 тикеров, 12 секторов)
-- [x] Preprocessing: FinBERT embeddings, PCA, macro, FRED, earnings, insider, calendar
-- [x] Обновление данных до апреля 2026 (400 тикеров S&P 500)
-- [x] Обучение TFT (3 эпохи, val_loss=3.68)
-- [x] Evaluation: MAPE 4.78%, DirAcc ~70%, CI Coverage 79%
-- [x] Backtesting: ConfLong Sharpe 8.15 / WR 63% (27 trades), Top-20 Sharpe 1.45 / Return +19.2%
-- [x] Live inference pipeline (yfinance + RSS + FinBERT + TFT)
-- [x] Все 8 ноутбуков исправлены и протестированы
+- [x] EDA HuggingFace датасета (2,638 тикеров, 12 секторов)
+- [x] Preprocessing: FinBERT embeddings → PCA 32d, macro, FRED, earnings, insider, calendar
+- [x] Обновление данных до Apr 2026 (400 тикеров)
+- [x] Обучение TFT (7 эпох сохранены: ep0..ep6)
+- [x] Ensemble study: per-surface оптимальные веса (ep5-heavy для Top Picks, ep2-heavy для Alpha Signals)
+- [x] Evaluation на single test window (Nov 2025 — Apr 2026, N=9200)
+- [x] Live inference pipeline (yfinance + RSS + FinBERT + TFT direct forward pass)
 - [x] 95% CI в output модели (квантили q0.02 и q0.98)
-- [ ] Walk-forward валидация (NB07) — отложено
-- [ ] Дообучение модели на 10-15 эпох (A100/H100) — отложено
+- [x] Blocklist для 28 S&P 500 тикеров с post-split data mismatch (36 entries total)
+- [x] Radical honesty: live_* targets (shrinked) + backtest_* raw в MODEL_METRICS
+- [ ] Walk-forward валидация (NB07) — отложено на retrain
+- [ ] Retrain на split-adjusted prices — откроет blocklist и снимет bearish bias
 
 ### Фаза 2: Backend MVP ✅ ЗАВЕРШЕНА
 - [x] 8 микросервисов FastAPI (api-gateway, auth, market-data, news, forecast, portfolio, notification, edgar)
@@ -806,27 +835,33 @@ WebSocket (Socket.IO):
 **Backend реализует ВСЮ функциональность из Фаз 2 + 4:**
 Portfolio, Watchlist, Earnings, Insider, News с sentiment, SEC EDGAR, Push-уведомления — всё уже в backend API.
 
-### Фаза 3: Frontend MVP 🔄 ТЕКУЩАЯ
-- [ ] Next.js проект с дизайн-системой (цвета, типографика, компоненты)
-- [ ] Landing Page с live demo
-- [ ] Dashboard + каталог S&P 500
-- [ ] Страница тикера: график + прогноз + новости
-- [ ] Top Picks страница
-- [ ] Auth (login/register/Google OAuth)
-- [ ] Command Palette (Cmd+K)
-- [ ] Portfolio management UI
-- [ ] Watchlist UI
-- [ ] News feed UI
-- [ ] Earnings Calendar UI
-- [ ] Notification center (WebSocket)
+### Фаза 3: Frontend MVP ✅ ЗАВЕРШЕНА
+- [x] Next.js 14 + TypeScript + Tailwind + shadcn/ui дизайн-система
+- [x] Landing Page с live demo Top Picks
+- [x] Dashboard + каталог 318 активных тикеров
+- [x] Страница тикера: TradingView candlestick + forecast overlay + news + earnings + insider
+- [x] Top Picks страница (ep5-heavy ensemble)
+- [x] Alpha Signals (Premium feed, ep2-heavy ensemble)
+- [x] Auth (email/password + Google OAuth, JWT + refresh rotation)
+- [x] Command Palette (Cmd+K)
+- [x] Portfolio management UI с P&L / корреляциями / секторами
+- [x] Watchlist UI с quick «Build Forecast»
+- [x] News feed с sentiment и фильтрами
+- [x] Earnings Calendar
+- [x] Notification center (Socket.IO + price/forecast/news/alert events)
+- [x] Plain-English PageGuide на всех 9 страницах
+- [x] Extreme-forecast warning chip (|1m return| > 30%)
+- [x] Live targets vs back-test caveat tooltips (radical honesty)
 
-### Фаза 4: Polish & Launch 📋
-- [ ] Анимации и micro-interactions (Framer Motion)
-- [ ] Performance optimization (lazy loading, virtualization)
-- [ ] Mobile responsive
-- [ ] Stripe integration (подписки)
+### Фаза 4: Polish & Launch 🔄 ТЕКУЩАЯ
+- [x] Анимации и micro-interactions (Framer Motion)
+- [x] Performance optimization (lazy loading, virtualization — TanStack Table)
+- [ ] Mobile responsive аудит
+- [ ] Stripe integration (Pro $15 / Premium $39)
+- [ ] Walk-forward валидация + retrain на split-adjusted prices
 - [ ] Деплой MVP (VPS / Railway / AWS)
-- [ ] CI/CD (GitHub Actions — уже настроен)
+- [x] CI/CD (GitHub Actions)
+- [x] Docker image publishing
 
 ---
 
