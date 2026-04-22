@@ -45,3 +45,7 @@ PROMPTS.md
 models/*.pkl
 models/config.json
 models/*.ipynb
+
+# Claude Code workspace files — not for public repo
+.claude/
+.mcp.json
