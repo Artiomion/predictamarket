@@ -210,8 +210,7 @@ Full API reference: [`docs/BACKEND_API.md`](docs/BACKEND_API.md)
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Engineers | All services, DB schema, data flow, scaling notes |
 | [`docs/MODEL.md`](docs/MODEL.md) | ML engineers / investors | TFT architecture, training, test metrics, live vs back-test |
 | [`docs/BACKEND_API.md`](docs/BACKEND_API.md) | Frontend devs | 66 endpoints, schemas, WebSocket events, rate limits |
-| `CLAUDE.md` | Claude Code sessions | Project context, conventions, caveats |
-| `PLAN.md` | Product | Full spec, screens, DB schemas, roadmap |
+| [`PLAN.md`](PLAN.md) | Product | Full spec, screens, DB schemas, roadmap |
 
 ---
 

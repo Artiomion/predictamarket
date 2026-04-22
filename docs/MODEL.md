@@ -504,7 +504,7 @@ block startup.
    - Raw back-test numbers → `backtest_*` fields
    - Apply shrinkage → `live_*` fields (see §8)
 6. Update `forecast.model_versions.metrics` JSONB in the DB.
-7. Update `CLAUDE.md` metrics table and `docs/MODEL.md` (this file).
+7. Update metrics tables in `PLAN.md` and `docs/MODEL.md` (this file).
 
 ---
 

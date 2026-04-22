@@ -422,4 +422,4 @@ Docker host
 - **Setup:** [`SETUP.md`](SETUP.md)
 - **ML model:** [`MODEL.md`](MODEL.md)
 - **API:** [`BACKEND_API.md`](BACKEND_API.md)
-- **Internal notes:** `ENSEMBLE_NOTES.md`, `CLAUDE.md`, `PLAN.md`
+- **Internal notes:** `ENSEMBLE_NOTES.md`, `PLAN.md`
